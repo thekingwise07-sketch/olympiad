@@ -76,6 +76,17 @@
         <div id="sets"></div>
       </section>
 
+      <section class="card hidden" id="sprintCard">
+        <h2>الضاحية: ترتيب المتسابقين</h2>
+        <p class="notice hidden" id="sprintNote"></p>
+        <label for="entryName">اسم المتسابق</label>
+        <input id="entryName" maxlength="60" style="width:100%;min-height:48px;padding:10px 14px;font:inherit;font-size:16px;border:1.5px solid #CBD5E1;border-radius:12px">
+        <label for="entryMosque">المسجد</label>
+        <select id="entryMosque" style="width:100%;min-height:48px;padding:10px 14px;font:inherit;font-size:16px;border:1.5px solid #CBD5E1;border-radius:12px"></select>
+        <div class="row"><button id="addEntryBtn" type="button" class="ghost">إضافة للترتيب</button></div>
+        <div id="rankList" style="margin-top:12px"></div>
+      </section>
+
       <section class="card" id="saveCard">
         <div class="row">
           <button id="draftBtn" type="button" class="ghost">حفظ كمسودة</button>
@@ -122,10 +133,24 @@
 
       const gSnap = await getDoc(doc(db, "games", match.gameId));
       game = gSnap.exists() ? { id: gSnap.id, ...gSnap.data() } : {};
-      if (!["football", "volleyball"].includes(game.type)) return bad("تفاصيل هذي اللعبة تنضاف لاحقاً. النتيجة تُدخل من صفحة المباريات");
+      if (!["football", "volleyball", "sprint"].includes(game.type)) return bad("تفاصيل هذي اللعبة تنضاف لاحقاً. النتيجة تُدخل من صفحة المباريات");
 
       const ms = await getDocs(query(collection(db, "mosques"), where("isTest", "==", false)));
       mosquesMap = Object.fromEntries(ms.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
+      if (game.type === "sprint") {
+        document.querySelectorAll(".teams2, #footballCard, #volleyCard, #teams, #statusTxt").forEach((n) => n.classList.add("hidden"));
+        $("content").classList.remove("hidden");
+        $("sprintCard").classList.remove("hidden");
+        $("title").textContent = "تفاصيل: " + (game.name || "");
+        if (match.status === "final") { $("finalNotice").classList.remove("hidden"); }
+        const sel = $("entryMosque");
+        sel.innerHTML = "";
+        Object.values(mosquesMap).sort((a, b) => (a.name || "").localeCompare(b.name || "")).forEach((m) => sel.appendChild(el("option", { value: m.id, text: m.name || m.id })));
+        ranking = (match.details?.ranking || []).map((x) => ({ name: x.name, mosqueId: x.mosqueId }));
+        renderRanking();
+        $("saveCard").classList.remove("hidden");
+        return;
+      }
 
       $("content").classList.remove("hidden");
       $("title").textContent = "تفاصيل: " + (game.name || "");
@@ -251,15 +276,44 @@
       $("scoreBig").textContent = s.a + " - " + s.b;
     }
 
+
+    // ---------- الضاحية ----------
+    let ranking = [];
+    function renderRanking() {
+      const box = $("rankList");
+      box.innerHTML = "";
+      if (!ranking.length) { box.appendChild(el("p", { class: "meta", text: "ما أضفت متسابقين بعد" })); return; }
+      ranking.forEach((r, i) => {
+        const up = el("button", { class: "ghost", type: "button", text: "▲", onclick: () => { if (i > 0) { [ranking[i - 1], ranking[i]] = [ranking[i], ranking[i - 1]]; renderRanking(); } } });
+        const down = el("button", { class: "ghost", type: "button", text: "▼", onclick: () => { if (i < ranking.length - 1) { [ranking[i + 1], ranking[i]] = [ranking[i], ranking[i + 1]]; renderRanking(); } } });
+        const del = el("button", { class: "danger", type: "button", text: "حذف", onclick: () => { ranking.splice(i, 1); renderRanking(); } });
+        ["▲", "▼", "حذف"].forEach(() => {});
+        box.appendChild(el("div", { class: "player" }, [
+          el("span", { class: "pname", text: (i + 1) + ". " + r.name + " (" + ((mosquesMap[r.mosqueId] || {}).name || "-") + ")" }),
+          el("div", { class: "row" }, [up, down, del]),
+        ]));
+      });
+    }
+    $("addEntryBtn").addEventListener("click", () => {
+      const name = $("entryName").value.trim();
+      if (name.length < 2) return;
+      ranking.push({ name, mosqueId: $("entryMosque").value });
+      $("entryName").value = "";
+      renderRanking();
+    });
+
     // ---------- الحفظ ----------
     async function save(status) {
       const msg = $("saveMsg");
       msg.className = "msg";
-      const s = computeScore();
+      const s = game.type === "sprint" ? { a: 0, b: 0 } : computeScore();
+      if (status === "final" && game.type === "sprint" && !ranking.length) { msg.classList.add("err"); msg.textContent = "أضف المتسابقين أول"; return; }
       if (status === "final" && !confirm("اعتماد النتيجة نهائياً؟")) return;
       const details = game.type === "football"
         ? { players: counters }
-        : { sets: sets.map((x) => ({ a: x.a, b: x.b })) };
+        : game.type === "sprint"
+          ? { ranking: ranking.map((r) => ({ name: r.name, mosqueId: r.mosqueId })) }
+          : { sets: sets.map((x) => ({ a: x.a, b: x.b })) };
       $("draftBtn").disabled = true; $("finalBtn").disabled = true;
       try {
         await updateDoc(doc(db, "matches", matchId), {

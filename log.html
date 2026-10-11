@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>سجل العمليات</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --blue:#1E3A8A; --bg:#F8FAFC; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; }
+    header { background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px; }
+    header h1 { margin: 0; font-size: 20px; font-weight: 900; }
+    header a { color: #fff; font-weight: 700; text-decoration: none; min-height: 48px; display: inline-flex; align-items: center; }
+    main { max-width: 640px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border-radius: 14px; padding: 14px; box-shadow: 0 4px 16px rgba(30,58,138,.08); margin-bottom: 10px; }
+    .act { font-weight: 900; color: var(--blue); }
+    .meta { color: #475569; font-size: 13px; margin-top: 4px; }
+    .det { color: #334155; font-size: 13px; margin-top: 4px; direction: ltr; text-align: right; word-break: break-all; }
+    .empty { color: #64748B; text-align: center; padding: 16px; }
+  </style>
+</head>
+<body>
+  <header><h1>سجل العمليات</h1><a href="app.html">رجوع</a></header>
+  <main id="list"><p class="empty">جاري التحميل...</p></main>
+
+  <script type="module">
+    import { auth, db } from "./firebase.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { collection, doc, getDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+    function el(tag, props = {}, children = []) {
+      const node = document.createElement(tag);
+      Object.entries(props).forEach(([k, v]) => { if (k === "class") node.className = v; else if (k === "text") node.textContent = v; else node[k] = v; });
+      children.forEach((c) => node.appendChild(c));
+      return node;
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return location.replace("index.html");
+      const snap = await getDoc(doc(db, "users", user.uid));
+      const p = snap.exists() ? snap.data() : null;
+      if (!p || p.disabled || p.deleted || !["admin", "supervisor"].includes(p.role)) return location.replace("app.html");
+
+      const logs = await getDocs(query(collection(db, "auditLog"), orderBy("at", "desc"), limit(100)));
+      const list = $("list");
+      list.innerHTML = "";
+      if (logs.empty) { list.appendChild(el("p", { class: "empty", text: "ما في عمليات بعد" })); return; }
+      logs.docs.forEach((d) => {
+        const r = d.data();
+        const when = r.at?.toDate ? r.at.toDate().toLocaleString("ar", { dateStyle: "medium", timeStyle: "short" }) : "";
+        const det = r.details && Object.keys(r.details).length ? JSON.stringify(r.details) : "";
+        list.appendChild(el("div", { class: "card" }, [
+          el("div", { class: "act", text: r.action || "-" }),
+          el("div", { class: "meta", text: when + (r.targetId ? " · الهدف: " + r.targetId : "") }),
+          det ? el("div", { class: "det", text: det }) : el("span"),
+        ]));
+      });
+    });
+  </script>
+  <script type="module" src="maintenance.js"></script>
+</body>
+</html>

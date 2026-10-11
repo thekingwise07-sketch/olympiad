@@ -152,6 +152,15 @@
         mosqueOptions.forEach((m) => s.appendChild(el("option", { value: m.id, text: m.name || m.id })));
       });
       if (mosqueOptions.length > 1) $("mosqueB").selectedIndex = 1;
+      const syncSprint = () => {
+        const isSprint = (games.find((g) => g.id === gs.value) || {}).type === "sprint";
+        ["mosqueA", "mosqueB"].forEach((sid) => {
+          $(sid).classList.toggle("hidden", isSprint);
+          $(sid).previousElementSibling.classList.toggle("hidden", isSprint);
+        });
+      };
+      gs.onchange = syncSprint;
+      syncSprint();
     }
 
     // ---------- قائمة المباريات ----------
@@ -178,10 +187,10 @@
             el("span", { class: "badge" + (final ? " final" : ""), text: final ? "نهائية" : "مسودة" }),
             el("span", { class: "score", text: (m.scoreA ?? 0) + " - " + (m.scoreB ?? 0) }),
           ]),
-          el("div", { class: "teams", text: mosqueName(m.mosqueA) + " ضد " + mosqueName(m.mosqueB) }),
+          el("div", { class: "teams", text: m.mosqueA ? mosqueName(m.mosqueA) + " ضد " + mosqueName(m.mosqueB) : "سباق الضاحية" }),
           el("div", { class: "meta", text: gameName(m.gameId) }),
           el("div", { class: "row" }, [
-            ...(["football", "volleyball"].includes(((games.find((g) => g.id === m.gameId)) || {}).type) ? [el("button", { class: "ghost", type: "button", text: "تفاصيل المباراة", onclick: () => { location.href = "match.html?id=" + m.id; } })] : []),
+            ...(["football", "volleyball", "sprint"].includes(((games.find((g) => g.id === m.gameId)) || {}).type) ? [el("button", { class: "ghost", type: "button", text: "تفاصيل المباراة", onclick: () => { location.href = "match.html?id=" + m.id; } })] : []),
             ...(canEdit ? [el("button", { class: "ghost", type: "button", text: final ? "تصحيح" : "تعديل", onclick: () => startEdit(m) })] : []),
             ...(canDelete ? [el("button", { class: "danger", type: "button", text: "حذف", onclick: () => removeMatch(m) })] : []),
           ]),
@@ -197,6 +206,9 @@
       const scoreA = Number($("scoreA").value);
       const scoreB = Number($("scoreB").value);
       if (!gameId) throw new Error("اختر اللعبة");
+      if ((games.find((g) => g.id === gameId) || {}).type === "sprint") {
+        return { gameId, mosqueA: "", mosqueB: "", scoreA: 0, scoreB: 0 };
+      }
       if (!mosqueA || !mosqueB) throw new Error("اختر الفريقين");
       if (mosqueA === mosqueB) throw new Error("الفريقين لازم يكونوا مسجدين مختلفين");
       for (const v of [scoreA, scoreB]) {
