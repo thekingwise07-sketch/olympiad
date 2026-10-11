@@ -42,6 +42,8 @@
     <a href="app.html">رجوع</a>
   </header>
 
+  <p id="status" style="margin:0;padding:8px 16px;background:#E0E7FF;color:#1E3A8A;font-size:14px;font-weight:700">جاري فحص الكود...</p>
+
   <main>
     <section class="card">
       <h2 id="formTitle">إضافة مسجد</h2>
@@ -67,6 +69,14 @@
   </main>
 
   <script>
+    setTimeout(function () {
+      var st = document.getElementById("status");
+      if (st && st.textContent.indexOf("اشتغل") === -1) {
+        st.textContent = "الكود ما اشتغل، صوّر هالشاشة وأرسلها";
+        st.style.background = "#FEE2E2";
+        st.style.color = "#B91C1C";
+      }
+    }, 5000);
     window.addEventListener("error", function (e) {
       var box = document.getElementById("formErr");
       if (box) box.textContent = "خطأ برمجي: " + (e.message || "غير معروف");
@@ -77,7 +87,8 @@
     });
   </script>
   <script type="module">
-    import { auth, db } from "./js/firebase.js";
+    document.getElementById("status").textContent = "الكود اشتغل ✅";
+    import { auth, db } from "./firebase.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import {
       collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp,
