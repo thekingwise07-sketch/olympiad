@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>إدارة الألعاب</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; --red:#B91C1C; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; }
+    header { background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px; }
+    header h1 { margin: 0; font-size: 20px; font-weight: 900; }
+    header a { color: #fff; font-weight: 700; text-decoration: none; min-height: 48px; display: inline-flex; align-items: center; }
+    main { max-width: 640px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 4px 16px rgba(30,58,138,.08); margin-bottom: 16px; }
+    h2 { margin: 0 0 12px; font-size: 19px; color: var(--blue); }
+    label { display: block; margin: 12px 0 6px; font-weight: 700; color: var(--blue); }
+    input, select { width: 100%; min-height: 48px; padding: 10px 14px; font: inherit; font-size: 16px; border: 1.5px solid #CBD5E1; border-radius: 12px; background: #fff; }
+    input[type="number"] { direction: ltr; text-align: right; }
+    input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,169,55,.25); }
+    button { min-height: 48px; padding: 0 16px; margin-top: 16px; font: inherit; font-weight: 700; font-size: 16px; background: var(--blue); color: #fff; border: 0; border-radius: 12px; cursor: pointer; }
+    button.ghost { background: #fff; color: var(--blue); border: 1.5px solid var(--blue); }
+    button.danger { background: var(--red); }
+    button:disabled { opacity: .6; cursor: default; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .row button { margin-top: 0; flex: 1 1 auto; font-size: 15px; }
+    .err { color: var(--red); min-height: 22px; margin: 10px 0 0; font-size: 15px; }
+    .hidden { display: none !important; }
+    .item { border: 1.5px solid #E2E8F0; border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+    .item-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .item-name { font-weight: 900; font-size: 17px; }
+    .item-meta { color: #475569; font-size: 15px; margin-top: 4px; }
+    .badge { font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: #E0E7FF; color: var(--blue); white-space: nowrap; }
+    .badge.off { background: #E2E8F0; color: #475569; }
+    .empty { color: #64748B; text-align: center; padding: 16px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>إدارة الألعاب</h1>
+    <a href="app.html">رجوع</a>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2 id="formTitle">إضافة لعبة</h2>
+      <form id="gameForm" autocomplete="off" onsubmit="return false;">
+        <label for="name">اسم اللعبة</label>
+        <input id="name" required maxlength="60">
+
+        <label for="type">نوع اللعبة</label>
+        <select id="type">
+          <option value="football">كرة القدم</option>
+          <option value="volleyball">الطائرة</option>
+          <option value="chess">الشطرنج</option>
+          <option value="sprint">الضاحية</option>
+        </select>
+
+        <label for="maxPlayers">الحد الأقصى للطلاب بالمسجد</label>
+        <input id="maxPlayers" type="number" min="1" max="99" required dir="ltr">
+
+        <div class="row">
+          <button id="saveBtn" type="button">حفظ</button>
+          <button id="cancelBtn" type="button" class="ghost hidden">إلغاء التعديل</button>
+        </div>
+        <p id="formErr" class="err" role="alert"></p>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>الألعاب</h2>
+      <div id="list"><p class="empty">جاري التحميل...</p></div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { auth, db, ROLE_LABELS } from "./firebase.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import {
+      collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp,
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+    const TYPE_LABELS = { football: "كرة القدم", volleyball: "الطائرة", chess: "الشطرنج", sprint: "الضاحية" };
+    let me = null;
+    let editingId = null;
+
+    // ---------- حماية الصفحة: للآدمن فقط ----------
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return location.replace("index.html");
+      const snap = await getDoc(doc(db, "users", user.uid));
+      const p = snap.exists() ? snap.data() : null;
+      if (!p || p.role !== "admin" || p.disabled || p.deleted || p.mustChange) {
+        return location.replace("app.html");
+      }
+      me = { uid: user.uid, ...p };
+      await loadGames();
+    });
+
+    function el(tag, props = {}, children = []) {
+      const node = document.createElement(tag);
+      Object.entries(props).forEach(([k, v]) => {
+        if (k === "class") node.className = v;
+        else if (k === "text") node.textContent = v;
+        else node[k] = v;
+      });
+      children.forEach((c) => node.appendChild(c));
+      return node;
+    }
+
+    const errText = (e) => (e?.code ? "[" + e.code + "] " : "") + (e?.message || "صار خطأ، حاول مرة ثانية");
+
+    async function audit(action, targetId, details = {}) {
+      await addDoc(collection(db, "auditLog"), {
+        actorUid: me.uid, action, targetId: targetId || null, details, at: serverTimestamp(),
+      });
+    }
+
+    // ---------- قائمة الألعاب ----------
+    async function loadGames() {
+      const snap = await getDocs(query(collection(db, "games"), orderBy("name")));
+      const list = $("list");
+      list.innerHTML = "";
+      if (snap.empty) {
+        list.appendChild(el("p", { class: "empty", text: "ما في ألعاب بعد" }));
+        return;
+      }
+      snap.docs.forEach((d) => list.appendChild(renderGame(d.id, d.data())));
+    }
+
+    function renderGame(id, g) {
+      const archived = !!g.archived;
+      const badge = el("span", { class: "badge" + (archived ? " off" : ""), text: archived ? "مخفية" : "ظاهرة" });
+      const head = el("div", { class: "item-head" }, [
+        el("div", {}, [
+          el("div", { class: "item-name", text: g.name || "-" }),
+          el("div", { class: "item-meta", text: (TYPE_LABELS[g.type] || g.type || "-") + " · الحد: " + (g.maxPlayers ?? "-") + " طالب" }),
+        ]),
+        badge,
+      ]);
+      const actions = el("div", { class: "row" }, [
+        el("button", { class: "ghost", type: "button", text: "تعديل", onclick: () => startEdit(id, g) }),
+        el("button", { class: "ghost", type: "button", text: archived ? "إظهار" : "إخفاء", onclick: () => toggleArchive(id, g, !archived) }),
+        el("button", { class: "danger", type: "button", text: "حذف نهائي", onclick: () => removeGame(id, g) }),
+      ]);
+      return el("div", { class: "item" }, [head, actions]);
+    }
+
+    // ---------- الفورم ----------
+    function resetForm() {
+      editingId = null;
+      $("gameForm").reset();
+      $("formTitle").textContent = "إضافة لعبة";
+      $("saveBtn").textContent = "حفظ";
+      $("cancelBtn").classList.add("hidden");
+      $("formErr").textContent = "";
+    }
+    $("cancelBtn").addEventListener("click", resetForm);
+
+    function startEdit(id, g) {
+      editingId = id;
+      $("name").value = g.name || "";
+      $("type").value = g.type || "football";
+      $("maxPlayers").value = g.maxPlayers ?? "";
+      $("formTitle").textContent = "تعديل: " + (g.name || "");
+      $("saveBtn").textContent = "حفظ التعديل";
+      $("cancelBtn").classList.remove("hidden");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function readPayload() {
+      const name = $("name").value.trim();
+      const type = $("type").value;
+      const maxPlayers = Number($("maxPlayers").value);
+      if (name.length < 2 || name.length > 60) throw new Error("اسم اللعبة لازم يكون بين 2 و60 حرف");
+      if (!TYPE_LABELS[type]) throw new Error("نوع اللعبة غير صحيح");
+      if (!Number.isInteger(maxPlayers) || maxPlayers < 1 || maxPlayers > 99) {
+        throw new Error("الحد الأقصى لازم يكون رقم بين 1 و99");
+      }
+      return { name, type, maxPlayers };
+    }
+
+    $("saveBtn").addEventListener("click", async () => {
+      const btn = $("saveBtn");
+      btn.disabled = true;
+      $("formErr").textContent = "";
+      try {
+        const payload = readPayload();
+        if (editingId) {
+          await updateDoc(doc(db, "games", editingId), { ...payload, updatedAt: serverTimestamp() });
+          await audit("game.update", editingId, payload);
+        } else {
+          const ref = await addDoc(collection(db, "games"), {
+            ...payload, archived: false, isTest: false,
+            createdAt: serverTimestamp(), createdBy: me.uid,
+          });
+          await audit("game.create", ref.id, payload);
+        }
+        resetForm();
+        await loadGames();
+      } catch (e) {
+        $("formErr").textContent = errText(e);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // ---------- الإخفاء والحذف ----------
+    async function toggleArchive(id, g, archived) {
+      const msg = archived ? "إخفاء اللعبة؟ بياناتها تبقى محفوظة." : "إظهار اللعبة من جديد؟";
+      if (!confirm(msg)) return;
+      try {
+        await updateDoc(doc(db, "games", id), { archived, updatedAt: serverTimestamp() });
+        await audit(archived ? "game.archive" : "game.unarchive", id, { name: g.name || "" });
+        await loadGames();
+      } catch (e) {
+        alert(errText(e));
+      }
+    }
+
+    async function removeGame(id, g) {
+      if (!confirm("حذف اللعبة (" + (g.name || "") + ") نهائياً؟ ما يرجع بعدها.")) return;
+      try {
+        await deleteDoc(doc(db, "games", id));
+        await audit("game.delete", id, { name: g.name || "" });
+        await loadGames();
+      } catch (e) {
+        alert(errText(e));
+      }
+    }
+  </script>
+</body>
+</html>
