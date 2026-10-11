@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>المباريات</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; --red:#B91C1C; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; }
+    header { background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px; }
+    header h1 { margin: 0; font-size: 20px; font-weight: 900; }
+    header a { color: #fff; font-weight: 700; text-decoration: none; min-height: 48px; display: inline-flex; align-items: center; }
+    main { max-width: 640px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 4px 16px rgba(30,58,138,.08); margin-bottom: 16px; }
+    h2 { margin: 0 0 12px; font-size: 19px; color: var(--blue); }
+    label { display: block; margin: 12px 0 6px; font-weight: 700; color: var(--blue); }
+    input, select { width: 100%; min-height: 48px; padding: 10px 14px; font: inherit; font-size: 16px; border: 1.5px solid #CBD5E1; border-radius: 12px; background: #fff; }
+    input[type="number"] { direction: ltr; text-align: center; }
+    input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,169,55,.25); }
+    input:disabled, select:disabled { background: #F1F5F9; color: #64748B; }
+    .scores { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; }
+    .scores span { font-weight: 900; font-size: 22px; color: var(--blue); }
+    button { min-height: 48px; padding: 0 16px; margin-top: 16px; font: inherit; font-weight: 700; font-size: 16px; background: var(--blue); color: #fff; border: 0; border-radius: 12px; cursor: pointer; }
+    button.ghost { background: #fff; color: var(--blue); border: 1.5px solid var(--blue); }
+    button.danger { background: var(--red); }
+    button:disabled { opacity: .5; cursor: default; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .row button { margin-top: 0; flex: 1 1 auto; font-size: 15px; }
+    .err { color: var(--red); min-height: 22px; margin: 10px 0 0; font-size: 15px; }
+    .hidden { display: none !important; }
+    .notice { background: #FEF3C7; color: #92400E; border-radius: 12px; padding: 12px; margin-bottom: 12px; font-weight: 700; }
+    .item { border: 1.5px solid #E2E8F0; border-radius: 14px; padding: 12px; margin-bottom: 10px; }
+    .item-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .score { font-size: 24px; font-weight: 900; color: var(--blue); direction: ltr; }
+    .teams { font-weight: 900; font-size: 17px; }
+    .meta { color: #475569; font-size: 14px; margin: 4px 0 8px; }
+    .badge { font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: #E0E7FF; color: var(--blue); white-space: nowrap; }
+    .badge.final { background: #DCFCE7; color: #166534; }
+    .empty { color: #64748B; text-align: center; padding: 16px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>المباريات</h1>
+    <a href="app.html">رجوع</a>
+  </header>
+
+  <main>
+    <div id="noGame" class="notice hidden">ما في لعبة مربوطة بحسابك، كلّم الآدمن.</div>
+
+    <section class="card">
+      <h2 id="formTitle">تسجيل مباراة</h2>
+      <form id="matchForm" autocomplete="off" onsubmit="return false;">
+        <label for="gameSelect">اللعبة</label>
+        <select id="gameSelect"></select>
+
+        <label for="mosqueA">الفريق الأول (المسجد)</label>
+        <select id="mosqueA"></select>
+
+        <label for="mosqueB">الفريق الثاني (المسجد)</label>
+        <select id="mosqueB"></select>
+
+        <label>النتيجة</label>
+        <div class="scores">
+          <input id="scoreA" type="number" min="0" max="99" value="0" dir="ltr">
+          <span>-</span>
+          <input id="scoreB" type="number" min="0" max="99" value="0" dir="ltr">
+        </div>
+
+        <div class="row">
+          <button id="draftBtn" type="button" class="ghost">حفظ كمسودة</button>
+          <button id="finalBtn" type="button">اعتماد نهائي</button>
+          <button id="cancelBtn" type="button" class="ghost hidden">إلغاء التعديل</button>
+        </div>
+        <p id="formErr" class="err" role="alert"></p>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>المباريات</h2>
+      <div id="list"><p class="empty">جاري التحميل...</p></div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { auth, db } from "./firebase.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import {
+      collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp,
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+    let me = null;
+    let games = [];
+    let mosquesMap = {};
+    let matches = [];
+    let editingId = null;
+    let editingOwner = null;
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return location.replace("index.html");
+      const snap = await getDoc(doc(db, "users", user.uid));
+      const p = snap.exists() ? snap.data() : null;
+      if (!p || p.disabled || p.deleted || p.mustChange || !["admin", "organizer"].includes(p.role)) {
+        return location.replace("app.html");
+      }
+      me = { uid: user.uid, ...p };
+
+      const gSnap = await getDocs(query(collection(db, "games"), where("isTest", "==", false)));
+      games = gSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((g) => !g.archived);
+      if (me.role === "organizer") games = games.filter((g) => g.id === me.gameId);
+
+      const mSnap = await getDocs(collection(db, "mosques"));
+      mosquesMap = Object.fromEntries(mSnap.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
+
+      if (!games.length) {
+        $("noGame").classList.remove("hidden");
+        $("list").innerHTML = "";
+        $("list").appendChild(el("p", { class: "empty", text: "ما في لعبة متاحة" }));
+        return;
+      }
+      fillSelects();
+      await loadMatches();
+    });
+
+    function el(tag, props = {}, children = []) {
+      const node = document.createElement(tag);
+      Object.entries(props).forEach(([k, v]) => {
+        if (k === "class") node.className = v;
+        else if (k === "text") node.textContent = v;
+        else node[k] = v;
+      });
+      children.forEach((c) => node.appendChild(c));
+      return node;
+    }
+
+    const errText = (e) => (e?.code ? "[" + e.code + "] " : "") + (e?.message || "صار خطأ، حاول مرة ثانية");
+    const mosqueName = (id) => (mosquesMap[id] || {}).name || id || "-";
+    const gameName = (id) => (games.find((g) => g.id === id) || {}).name || "-";
+
+    function fillSelects() {
+      const gs = $("gameSelect");
+      gs.innerHTML = "";
+      games.forEach((g) => gs.appendChild(el("option", { value: g.id, text: g.name || g.id })));
+      gs.disabled = me.role === "organizer";
+
+      const mosqueOptions = Object.values(mosquesMap).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+      ["mosqueA", "mosqueB"].forEach((sid) => {
+        const s = $(sid);
+        s.innerHTML = "";
+        mosqueOptions.forEach((m) => s.appendChild(el("option", { value: m.id, text: m.name || m.id })));
+      });
+      if (mosqueOptions.length > 1) $("mosqueB").selectedIndex = 1;
+    }
+
+    // ---------- قائمة المباريات ----------
+    async function loadMatches() {
+      const snap = await getDocs(query(collection(db, "matches"), where("isTest", "==", false)));
+      matches = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      if (me.role === "organizer") matches = matches.filter((m) => m.gameId === me.gameId);
+      renderMatches();
+    }
+
+    function renderMatches() {
+      const list = $("list");
+      list.innerHTML = "";
+      if (!matches.length) {
+        list.appendChild(el("p", { class: "empty", text: "ما في مباريات مسجّلة بعد" }));
+        return;
+      }
+      matches.forEach((m) => {
+        const final = m.status === "final";
+        const canEdit = me.role === "admin" || (!final && m.organizerUid === me.uid);
+        const canDelete = me.role === "admin" || (!final && m.organizerUid === me.uid);
+        list.appendChild(el("div", { class: "item" }, [
+          el("div", { class: "item-head" }, [
+            el("span", { class: "badge" + (final ? " final" : ""), text: final ? "نهائية" : "مسودة" }),
+            el("span", { class: "score", text: (m.scoreA ?? 0) + " - " + (m.scoreB ?? 0) }),
+          ]),
+          el("div", { class: "teams", text: mosqueName(m.mosqueA) + " ضد " + mosqueName(m.mosqueB) }),
+          el("div", { class: "meta", text: gameName(m.gameId) }),
+          el("div", { class: "row" }, [
+            ...(canEdit ? [el("button", { class: "ghost", type: "button", text: final ? "تصحيح" : "تعديل", onclick: () => startEdit(m) })] : []),
+            ...(canDelete ? [el("button", { class: "danger", type: "button", text: "حذف", onclick: () => removeMatch(m) })] : []),
+          ]),
+        ]));
+      });
+    }
+
+    // ---------- الفورم ----------
+    function readForm() {
+      const gameId = $("gameSelect").value;
+      const mosqueA = $("mosqueA").value;
+      const mosqueB = $("mosqueB").value;
+      const scoreA = Number($("scoreA").value);
+      const scoreB = Number($("scoreB").value);
+      if (!gameId) throw new Error("اختر اللعبة");
+      if (!mosqueA || !mosqueB) throw new Error("اختر الفريقين");
+      if (mosqueA === mosqueB) throw new Error("الفريقين لازم يكونوا مسجدين مختلفين");
+      for (const v of [scoreA, scoreB]) {
+        if (!Number.isInteger(v) || v < 0 || v > 99) throw new Error("النتيجة لازم تكون رقم بين 0 و99");
+      }
+      return { gameId, mosqueA, mosqueB, scoreA, scoreB };
+    }
+
+    function resetForm() {
+      editingId = null;
+      editingOwner = null;
+      $("formTitle").textContent = "تسجيل مباراة";
+      $("scoreA").value = 0;
+      $("scoreB").value = 0;
+      $("cancelBtn").classList.add("hidden");
+      $("formErr").textContent = "";
+      $("draftBtn").disabled = false;
+      $("finalBtn").disabled = false;
+    }
+    $("cancelBtn").addEventListener("click", resetForm);
+
+    function startEdit(m) {
+      editingId = m.id;
+      editingOwner = m.organizerUid;
+      $("formTitle").textContent = "تعديل: " + mosqueName(m.mosqueA) + " ضد " + mosqueName(m.mosqueB);
+      $("gameSelect").value = m.gameId;
+      $("mosqueA").value = m.mosqueA;
+      $("mosqueB").value = m.mosqueB;
+      $("scoreA").value = m.scoreA ?? 0;
+      $("scoreB").value = m.scoreB ?? 0;
+      $("cancelBtn").classList.remove("hidden");
+      $("formErr").textContent = "";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    async function save(status) {
+      $("formErr").textContent = "";
+      let data;
+      try { data = readForm(); } catch (e) { return ($("formErr").textContent = e.message); }
+
+      const wasFinal = editingId && matches.find((m) => m.id === editingId)?.status === "final";
+      if (status === "final" && !confirm("اعتماد النتيجة نهائياً؟ بعدها ما تتعدل إلا من الآدمن.")) return;
+      if (wasFinal && me.role === "admin" && !confirm("تصحيح نتيجة نهائية؟ هذا التغيير ينكتب بالسجل.")) return;
+
+      $("draftBtn").disabled = true;
+      $("finalBtn").disabled = true;
+      try {
+        if (editingId) {
+          await updateDoc(doc(db, "matches", editingId), { ...data, status, isTest: false, updatedAt: serverTimestamp() });
+          if (me.role === "admin") await audit(wasFinal ? "match.correct" : "match.update", editingId, { status, ...data });
+        } else {
+          await addDoc(collection(db, "matches"), {
+            ...data, status, isTest: false, organizerUid: me.uid,
+            createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+          });
+        }
+        resetForm();
+        await loadMatches();
+      } catch (e) {
+        $("formErr").textContent = errText(e);
+      } finally {
+        $("draftBtn").disabled = false;
+        $("finalBtn").disabled = false;
+      }
+    }
+
+    $("draftBtn").addEventListener("click", () => save("draft"));
+    $("finalBtn").addEventListener("click", () => save("final"));
+
+    async function removeMatch(m) {
+      if (!confirm("حذف هذه المباراة؟")) return;
+      try {
+        await deleteDoc(doc(db, "matches", m.id));
+        await loadMatches();
+      } catch (e) {
+        alert(errText(e));
+      }
+    }
+
+    async function audit(action, targetId, details = {}) {
+      await addDoc(collection(db, "auditLog"), {
+        actorUid: me.uid, action, targetId: targetId || null, details, at: serverTimestamp(),
+      });
+    }
+  </script>
+</body>
+</html>

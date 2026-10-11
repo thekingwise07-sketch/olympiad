@@ -45,6 +45,11 @@
 
   <main>
     <section class="card">
+      <h2>طلبات فتح التعديل</h2>
+      <div id="requestsList"><p class="empty">جاري التحميل...</p></div>
+    </section>
+
+    <section class="card">
       <h2 id="formTitle">إضافة مسجد</h2>
       <form id="mosqueForm" autocomplete="off" onsubmit="return false;">
         <label for="name">اسم المسجد</label>
@@ -89,7 +94,7 @@
     import { auth, db } from "./firebase.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import {
-      collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp,
+      collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, where,
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const $ = (id) => document.getElementById(id);
@@ -106,6 +111,7 @@
       }
       me = { uid: user.uid, ...p };
       await loadMosques();
+      await loadRequests();
     });
 
     function el(tag, props = {}, children = []) {
@@ -160,6 +166,51 @@
         await updateDoc(doc(db, "mosques", id), { locked: false, unlockedAt: serverTimestamp() });
         await audit("mosque.unlock", id, { name: m.name || "" });
         await loadMosques();
+      } catch (e) {
+        alert(errText(e));
+      }
+    }
+
+
+    // ---------- طلبات فتح التعديل ----------
+    async function loadRequests() {
+      const snap = await getDocs(query(collection(db, "requests"), where("status", "==", "pending")));
+      const list = document.getElementById("requestsList");
+      list.innerHTML = "";
+      if (snap.empty) {
+        list.appendChild(el("p", { class: "empty", text: "ما في طلبات معلّقة" }));
+        return;
+      }
+      snap.docs.forEach((d) => {
+        const r = d.data();
+        list.appendChild(el("div", { class: "item" }, [
+          el("div", { class: "item-name", text: r.mosqueName || r.mosqueId || "-" }),
+          el("div", { class: "item-actions" }, [
+            el("button", { class: "ghost", type: "button", text: "فتح القفل", onclick: () => approveRequest(d.id, r) }),
+            el("button", { class: "danger", type: "button", text: "رفض", onclick: () => rejectRequest(d.id, r) }),
+          ]),
+        ]));
+      });
+    }
+
+    async function approveRequest(reqId, r) {
+      if (!confirm("فتح التعديل لمسجد (" + (r.mosqueName || "") + ")؟")) return;
+      try {
+        await updateDoc(doc(db, "mosques", r.mosqueId), { locked: false, unlockedAt: serverTimestamp() });
+        await updateDoc(doc(db, "requests", reqId), { status: "approved", decidedAt: serverTimestamp(), decidedBy: me.uid });
+        await audit("mosque.unlock_approved", r.mosqueId, { requestId: reqId });
+        await loadMosques();
+        await loadRequests();
+      } catch (e) {
+        alert(errText(e));
+      }
+    }
+
+    async function rejectRequest(reqId, r) {
+      if (!confirm("رفض طلب فتح التعديل لمسجد (" + (r.mosqueName || "") + ")؟")) return;
+      try {
+        await updateDoc(doc(db, "requests", reqId), { status: "rejected", decidedAt: serverTimestamp(), decidedBy: me.uid });
+        await loadRequests();
       } catch (e) {
         alert(errText(e));
       }

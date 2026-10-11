@@ -68,6 +68,8 @@
       <p id="mosqueName" class="item-name"></p>
       <button id="lockBtn" type="button" class="danger hidden">اعتماد التسجيل وقفل المسجد</button>
       <p id="lockErr" class="err"></p>
+      <button id="reqBtn" type="button" class="ghost hidden">طلب فتح التعديل من الآدمن</button>
+      <p id="reqMsg" class="item-meta"></p>
       <p id="maxInfo" class="item-meta"></p>
     </section>
 
@@ -173,6 +175,7 @@
       resetForm();
       await loadGames();
       await loadStudents();
+      await loadUnlockRequest();
     }
 
 
@@ -185,6 +188,41 @@
         await selectMosque(mosqueId);
       } catch (e) {
         $("lockErr").textContent = errText(e);
+      }
+    });
+
+
+    async function loadUnlockRequest() {
+      $("reqBtn").classList.add("hidden");
+      $("reqMsg").textContent = "";
+      if (me.role !== "mosque_supervisor" || !mosqueLocked) return;
+      const snap = await getDocs(query(
+        collection(db, "requests"),
+        where("requestedBy", "==", me.uid),
+        where("status", "==", "pending")
+      ));
+      const pending = snap.docs.find((d) => d.data().mosqueId === mosqueId);
+      if (pending) {
+        $("reqMsg").textContent = "طلبك لفتح التعديل قيد المراجعة عند الآدمن.";
+      } else {
+        $("reqBtn").classList.remove("hidden");
+      }
+    }
+
+    $("reqBtn").addEventListener("click", async () => {
+      $("reqMsg").textContent = "";
+      try {
+        await addDoc(collection(db, "requests"), {
+          type: "unlock",
+          mosqueId,
+          mosqueName: mosquesMap[mosqueId]?.name || mosqueId,
+          requestedBy: me.uid,
+          status: "pending",
+          createdAt: serverTimestamp(),
+        });
+        await loadUnlockRequest();
+      } catch (e) {
+        $("reqMsg").textContent = errText(e);
       }
     });
 
