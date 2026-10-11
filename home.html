@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>أولمبياد المساجد</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; padding-bottom: 80px; }
+    header { background: var(--blue); color: #fff; text-align: center; padding: calc(20px + env(safe-area-inset-top, 0px)) 16px 20px; }
+    header h1 { margin: 0; font-size: 22px; font-weight: 900; }
+    header span { color: var(--gold); }
+    main { max-width: 640px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border-radius: 14px; padding: 18px; box-shadow: 0 4px 16px rgba(30,58,138,.08); margin-bottom: 16px; }
+    h2 { margin: 0 0 12px; font-size: 18px; color: var(--blue); }
+    .item { border-bottom: 1px solid #E2E8F0; padding: 10px 0; }
+    .item:last-child { border-bottom: 0; }
+    .teams { font-weight: 900; font-size: 16px; }
+    .score { font-size: 20px; font-weight: 900; color: var(--gold); direction: ltr; }
+    .meta { color: #475569; font-size: 14px; margin-top: 4px; }
+    .news-title { font-weight: 900; font-size: 16px; }
+    .news-body { color: #334155; font-size: 15px; line-height: 1.7; white-space: pre-wrap; }
+    .empty { color: #64748B; text-align: center; padding: 10px; }
+    nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #E2E8F0; display: flex; justify-content: space-around; padding: 8px 0 calc(8px + env(safe-area-inset-bottom, 0px)); }
+    nav a { text-decoration: none; color: var(--blue); font-weight: 700; font-size: 13px; text-align: center; min-width: 56px; padding: 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>أولمبياد <span>المساجد</span></h1>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>آخر المباريات</h2>
+      <div id="matches"><p class="empty">جاري التحميل...</p></div>
+    </section>
+
+    <section class="card">
+      <h2>آخر الأخبار</h2>
+      <div id="news"><p class="empty">جاري التحميل...</p></div>
+    </section>
+  </main>
+
+  <nav>
+    <a href="home.html">الرئيسية</a>
+    <a href="ranking.html">الترتيب</a>
+    <a href="news.html">الأخبار</a>
+    <a href="rules.html">القوانين</a>
+    <a href="index.html">دخول</a>
+  </nav>
+
+  <script type="module">
+    import { db } from "./firebase.js";
+    import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+
+    function el(tag, props = {}, children = []) {
+      const node = document.createElement(tag);
+      Object.entries(props).forEach(([k, v]) => {
+        if (k === "class") node.className = v;
+        else if (k === "text") node.textContent = v;
+        else node[k] = v;
+      });
+      children.forEach((c) => node.appendChild(c));
+      return node;
+    }
+
+    async function load() {
+      try {
+        const [mSnap, gSnap, mtSnap, nSnap] = await Promise.all([
+          getDocs(query(collection(db, "mosques"), where("isTest", "==", false))),
+          getDocs(query(collection(db, "games"), where("isTest", "==", false))),
+          getDocs(query(collection(db, "matches"), where("isTest", "==", false), where("status", "==", "final"))),
+          getDocs(query(collection(db, "news"), where("isTest", "==", false))),
+        ]);
+        const mosques = Object.fromEntries(mSnap.docs.map((d) => [d.id, d.data()]));
+
+        const matches = mtSnap.docs.map((d) => d.data());
+        const mBox = $("matches");
+        mBox.innerHTML = "";
+        if (!matches.length) mBox.appendChild(el("p", { class: "empty", text: "ما في مباريات نهائية بعد" }));
+        matches.slice(0, 5).forEach((m) => {
+          mBox.appendChild(el("div", { class: "item" }, [
+            el("div", { class: "teams", text: (mosques[m.mosqueA]?.name || "-") + " ضد " + (mosques[m.mosqueB]?.name || "-") }),
+            el("div", { class: "score", text: (m.scoreA ?? 0) + " - " + (m.scoreB ?? 0) }),
+          ]));
+        });
+
+        const news = nSnap.docs.map((d) => d.data());
+        news.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+        const nBox = $("news");
+        nBox.innerHTML = "";
+        if (!news.length) nBox.appendChild(el("p", { class: "empty", text: "ما في أخبار بعد" }));
+        news.slice(0, 3).forEach((n) => {
+          nBox.appendChild(el("div", { class: "item" }, [
+            el("div", { class: "news-title", text: n.title || "-" }),
+            el("div", { class: "news-body", text: n.body || "" }),
+          ]));
+        });
+      } catch (e) {
+        $("matches").innerHTML = "";
+        $("matches").appendChild(el("p", { class: "empty", text: "ما قدرنا نحمّل البيانات الحين" }));
+      }
+    }
+    load();
+  </script>
+  <script type="module" src="maintenance.js"></script>
+</body>
+</html>

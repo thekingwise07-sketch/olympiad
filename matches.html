@@ -88,9 +88,7 @@
   <script type="module">
     import { auth, db } from "./firebase.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import {
-      collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp,
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const $ = (id) => document.getElementById(id);
     let me = null;
@@ -113,7 +111,7 @@
       games = gSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((g) => !g.archived);
       if (me.role === "organizer") games = games.filter((g) => g.id === me.gameId);
 
-      const mSnap = await getDocs(collection(db, "mosques"));
+      const mSnap = await getDocs(query(collection(db, "mosques"), where("isTest", "==", false)));
       mosquesMap = Object.fromEntries(mSnap.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
 
       if (!games.length) {
@@ -283,5 +281,6 @@
       });
     }
   </script>
+  <script type="module" src="maintenance.js"></script>
 </body>
 </html>

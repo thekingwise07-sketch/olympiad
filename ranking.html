@@ -105,7 +105,7 @@
     async function loadAll() {
       const [gSnap, mSnap, sSnap, mtSnap] = await Promise.all([
         getDocs(query(collection(db, "games"), where("isTest", "==", false))),
-        getDocs(collection(db, "mosques")),
+        getDocs(query(collection(db, "mosques"), where("isTest", "==", false))),
         getDoc(doc(db, "settings", "points")),
         getDocs(query(collection(db, "matches"), where("isTest", "==", false), where("status", "==", "final"))),
       ]);
@@ -220,5 +220,6 @@
       }
     });
   </script>
+  <script type="module" src="maintenance.js"></script>
 </body>
 </html>
