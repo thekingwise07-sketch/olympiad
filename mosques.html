@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>إدارة المساجد</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; --red:#B91C1C; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; }
+    header { background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px; }
+    header h1 { margin: 0; font-size: 20px; font-weight: 900; }
+    header a { color: #fff; font-weight: 700; text-decoration: none; min-height: 48px; display: inline-flex; align-items: center; }
+    main { max-width: 640px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 4px 16px rgba(30,58,138,.08); margin-bottom: 16px; }
+    h2 { margin: 0 0 12px; font-size: 19px; color: var(--blue); }
+    label { display: block; margin: 12px 0 6px; font-weight: 700; color: var(--blue); }
+    input { width: 100%; min-height: 48px; padding: 10px 14px; font: inherit; font-size: 16px; border: 1.5px solid #CBD5E1; border-radius: 12px; background: #fff; }
+    input[type="color"] { padding: 4px; height: 48px; }
+    input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,169,55,.25); }
+    button { min-height: 48px; padding: 0 16px; margin-top: 16px; font: inherit; font-weight: 700; font-size: 16px; background: var(--blue); color: #fff; border: 0; border-radius: 12px; cursor: pointer; }
+    button.ghost { background: #fff; color: var(--blue); border: 1.5px solid var(--blue); }
+    button.danger { background: var(--red); }
+    button:disabled { opacity: .6; cursor: default; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .row button { margin-top: 0; flex: 1 1 auto; font-size: 15px; }
+    .err { color: var(--red); min-height: 22px; margin: 10px 0 0; font-size: 15px; }
+    .hidden { display: none !important; }
+    .item { display: flex; align-items: center; gap: 12px; border: 1.5px solid #E2E8F0; border-radius: 14px; padding: 12px; margin-bottom: 10px; }
+    .swatch { width: 40px; height: 40px; border-radius: 10px; flex: 0 0 40px; border: 2px solid #fff; box-shadow: 0 0 0 1px #CBD5E1; }
+    .item-name { font-weight: 900; font-size: 17px; flex: 1; }
+    .item-actions { display: flex; gap: 6px; }
+    .item-actions button { min-height: 40px; margin-top: 0; padding: 0 12px; font-size: 14px; }
+    .empty { color: #64748B; text-align: center; padding: 16px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>إدارة المساجد</h1>
+    <a href="app.html">رجوع</a>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2 id="formTitle">إضافة مسجد</h2>
+      <form id="mosqueForm" autocomplete="off">
+        <label for="name">اسم المسجد</label>
+        <input id="name" required maxlength="60">
+
+        <label for="color">لون المسجد</label>
+        <input id="color" type="color" value="#1E3A8A">
+
+        <div class="row">
+          <button id="saveBtn" type="submit">حفظ</button>
+          <button id="cancelBtn" type="button" class="ghost hidden">إلغاء التعديل</button>
+        </div>
+        <p id="formErr" class="err" role="alert"></p>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>المساجد</h2>
+      <div id="list"><p class="empty">جاري التحميل...</p></div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { auth, db } from "./js/firebase.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import {
+      collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp,
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+    let me = null;
+    let editingId = null;
+
+    // ---------- حماية الصفحة: للآدمن فقط ----------
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return location.replace("index.html");
+      const snap = await getDoc(doc(db, "users", user.uid));
+      const p = snap.exists() ? snap.data() : null;
+      if (!p || p.role !== "admin" || p.disabled || p.deleted || p.mustChange) {
+        return location.replace("app.html");
+      }
+      me = { uid: user.uid, ...p };
+      await loadMosques();
+    });
+
+    function el(tag, props = {}, children = []) {
+      const node = document.createElement(tag);
+      Object.entries(props).forEach(([k, v]) => {
+        if (k === "class") node.className = v;
+        else if (k === "text") node.textContent = v;
+        else if (k === "style") Object.assign(node.style, v);
+        else node[k] = v;
+      });
+      children.forEach((c) => node.appendChild(c));
+      return node;
+    }
+
+    const errText = (e) => (e?.code ? "[" + e.code + "] " : "") + (e?.message || "صار خطأ، حاول مرة ثانية");
+
+    async function audit(action, targetId, details = {}) {
+      await addDoc(collection(db, "auditLog"), {
+        actorUid: me.uid, action, targetId: targetId || null, details, at: serverTimestamp(),
+      });
+    }
+
+    // ---------- قائمة المساجد ----------
+    async function loadMosques() {
+      const snap = await getDocs(query(collection(db, "mosques"), orderBy("name")));
+      const list = $("list");
+      list.innerHTML = "";
+      if (snap.empty) {
+        list.appendChild(el("p", { class: "empty", text: "ما في مساجد بعد" }));
+        return;
+      }
+      snap.docs.forEach((d) => list.appendChild(renderMosque(d.id, d.data())));
+    }
+
+    function renderMosque(id, m) {
+      return el("div", { class: "item" }, [
+        el("div", { class: "swatch", style: { background: m.color || "#1E3A8A" } }),
+        el("div", { class: "item-name", text: m.name || "-" }),
+        el("div", { class: "item-actions" }, [
+          el("button", { class: "ghost", type: "button", text: "تعديل", onclick: () => startEdit(id, m) }),
+          el("button", { class: "danger", type: "button", text: "حذف", onclick: () => removeMosque(id, m) }),
+        ]),
+      ]);
+    }
+
+    // ---------- الفورم ----------
+    function resetForm() {
+      editingId = null;
+      $("mosqueForm").reset();
+      $("color").value = "#1E3A8A";
+      $("formTitle").textContent = "إضافة مسجد";
+      $("saveBtn").textContent = "حفظ";
+      $("cancelBtn").classList.add("hidden");
+      $("formErr").textContent = "";
+    }
+    $("cancelBtn").addEventListener("click", resetForm);
+
+    function startEdit(id, m) {
+      editingId = id;
+      $("name").value = m.name || "";
+      $("color").value = m.color || "#1E3A8A";
+      $("formTitle").textContent = "تعديل: " + (m.name || "");
+      $("saveBtn").textContent = "حفظ التعديل";
+      $("cancelBtn").classList.remove("hidden");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    $("mosqueForm").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const btn = $("saveBtn");
+      btn.disabled = true;
+      $("formErr").textContent = "";
+
+      const name = $("name").value.trim();
+      const color = $("color").value;
+      if (name.length < 2 || name.length > 60) {
+        $("formErr").textContent = "اسم المسجد لازم يكون بين 2 و60 حرف";
+        btn.disabled = false;
+        return;
+      }
+
+      try {
+        if (editingId) {
+          await updateDoc(doc(db, "mosques", editingId), { name, color, updatedAt: serverTimestamp() });
+          await audit("mosque.update", editingId, { name });
+        } else {
+          const ref = await addDoc(collection(db, "mosques"), {
+            name, color, locked: false, isTest: false,
+            createdAt: serverTimestamp(), createdBy: me.uid,
+          });
+          await audit("mosque.create", ref.id, { name });
+        }
+        resetForm();
+        await loadMosques();
+      } catch (e) {
+        $("formErr").textContent = errText(e);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // ---------- الحذف ----------
+    async function removeMosque(id, m) {
+      if (!confirm("حذف مسجد (" + (m.name || "") + ")؟ ما يرجع بعدها.")) return;
+      try {
+        await deleteDoc(doc(db, "mosques", id));
+        await audit("mosque.delete", id, { name: m.name || "" });
+        await loadMosques();
+      } catch (e) {
+        alert(errText(e));
+      }
+    }
+  </script>
+</body>
+</html>
