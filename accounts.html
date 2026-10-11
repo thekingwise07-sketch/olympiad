@@ -43,7 +43,7 @@
 <body>
   <header>
     <h1>إدارة الحسابات</h1>
-    <a href="../app.html">رجوع</a>
+    <a href="app.html">رجوع</a>
   </header>
 
   <main>
@@ -99,7 +99,7 @@
   </main>
 
   <script type="module">
-    import { auth, db, ROLE_LABELS, genPassword, createAuthAccount, usernameToEmail } from "../js/firebase.js";
+    import { auth, db, ROLE_LABELS, genPassword, createAuthAccount, usernameToEmail } from "./firebase.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import {
       collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, query, orderBy, serverTimestamp,
@@ -115,11 +115,11 @@
 
     // ---------- حماية الصفحة ----------
     onAuthStateChanged(auth, async (user) => {
-      if (!user) return location.replace("../index.html");
+      if (!user) return location.replace("index.html");
       const snap = await getDoc(doc(db, "users", user.uid));
       const p = snap.exists() ? snap.data() : null;
       if (!p || p.role !== "admin" || p.disabled || p.deleted || p.mustChange) {
-        return location.replace("../app.html");
+        return location.replace("app.html");
       }
       me = { uid: user.uid, ...p };
       await loadLookups();

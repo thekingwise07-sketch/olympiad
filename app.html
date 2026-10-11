@@ -35,11 +35,11 @@
       <h2>أهلاً بك</h2>
       <p>الصفحات الرئيسية (الأخبار، المباريات، الترتيب) تُبنى في المرحلة اللاحقة.</p>
     </section>
-    <a class="tile hidden" id="adminLink" href="admin/accounts.html">إدارة الحسابات</a>
+    <a class="tile hidden" id="adminLink" href="accounts.html">إدارة الحسابات</a>
   </main>
 
   <script type="module">
-    import { auth, db, ROLE_LABELS } from "./js/firebase.js";
+    import { auth, db, ROLE_LABELS } from "./firebase.js";
     import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
