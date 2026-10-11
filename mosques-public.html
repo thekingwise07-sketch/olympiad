@@ -5,34 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#1E3A8A">
   <title>المساجد</title>
+  <link rel="stylesheet" href="theme.css">
+  <script>(function(){document.documentElement.setAttribute("data-theme",localStorage.getItem("theme")||"dark");})();</script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
-  <style>
-    :root { --blue:#1E3A8A; --bg:#F8FAFC; }
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; padding-bottom: 84px; }
-    header { background: var(--blue); color: #fff; text-align: center; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px; }
-    header h1 { margin: 0; font-size: 20px; font-weight: 900; }
-    main { max-width: 640px; margin: 0 auto; padding: 16px; }
-    .m { display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 14px; padding: 12px; margin-bottom: 10px; box-shadow: 0 4px 16px rgba(30,58,138,.08); text-decoration: none; color: #0F172A; }
-    .logo { width: 48px; height: 48px; border-radius: 12px; object-fit: cover; flex: 0 0 48px; }
-    .ph { width: 48px; height: 48px; border-radius: 12px; flex: 0 0 48px; }
-    .name { font-weight: 900; font-size: 17px; }
-    .empty { color: #64748B; text-align: center; padding: 16px; }
-    nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #E2E8F0; display: flex; justify-content: space-around; padding: 8px 0 calc(8px + env(safe-area-inset-bottom, 0px)); }
-    nav a { text-decoration: none; color: var(--blue); font-weight: 700; font-size: 12px; text-align: center; min-width: 56px; padding: 6px; }
-  </style>
 </head>
 <body>
-  <header><h1>المساجد</h1></header>
-  <main id="list"><p class="empty">جاري التحميل...</p></main>
-  <nav>
-    <a href="home.html">الرئيسية</a>
-    <a href="matches-public.html">المباريات</a>
-    <a href="ranking.html">الترتيب</a>
-    <a href="mosques-public.html">المساجد</a>
-    <a href="news.html">الأخبار</a>
-    <a href="rules.html">القوانين</a>
-    <a href="index.html">دخول</a>
+  <div class="topbar"><div class="brand">المساجد</div><a class="btn ghost" href="app.html">الرئيسية</a></div>
+  <main class="wrap" id="list"><p class="empty">جاري التحميل...</p></main>
+  <nav class="tabbar">
+    <a href="app.html" class=""><span class="ic">🏠</span>الرئيسية</a>
+    <a href="matches-public.html" class=""><span class="ic">⚽</span>المباريات</a>
+    <a href="ranking.html" class=""><span class="ic">🏆</span>الترتيب</a>
+    <a href="mosques-public.html" class="active"><span class="ic">🕌</span>المساجد</a>
+    <a href="news.html" class=""><span class="ic">📰</span>الأخبار</a>
+    <a href="rules.html" class=""><span class="ic">📜</span>القوانين</a>
   </nav>
   <script type="module">
     import { db, tf } from "./firebase.js";

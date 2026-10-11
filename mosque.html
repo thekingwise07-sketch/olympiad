@@ -5,40 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#1E3A8A">
   <title>صفحة المسجد</title>
+  <link rel="stylesheet" href="theme.css">
+  <script>(function(){document.documentElement.setAttribute("data-theme",localStorage.getItem("theme")||"dark");})();</script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
-  <style>
-    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; }
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; }
-    header { background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px; }
-    header h1 { margin: 0; font-size: 18px; font-weight: 900; }
-    header a { color: #fff; font-weight: 700; text-decoration: none; min-height: 48px; display: inline-flex; align-items: center; }
-    main { max-width: 640px; margin: 0 auto; padding: 16px; }
-    .card { background: #fff; border-radius: 14px; padding: 18px; box-shadow: 0 4px 16px rgba(30,58,138,.08); margin-bottom: 16px; }
-    .top { display: flex; align-items: center; gap: 14px; }
-    .logo { width: 72px; height: 72px; border-radius: 16px; object-fit: cover; flex: 0 0 72px; }
-    .logo-ph { width: 72px; height: 72px; border-radius: 16px; flex: 0 0 72px; }
-    .mname { font-size: 22px; font-weight: 900; color: var(--blue); }
-    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; text-align: center; }
-    .stat b { display: block; font-size: 22px; color: var(--gold); direction: ltr; }
-    .stat span { font-size: 13px; color: #475569; }
-    h2 { margin: 0 0 10px; font-size: 17px; color: var(--blue); }
-    .game { border-bottom: 1px solid #E2E8F0; padding: 10px 0; }
-    .game:last-child { border-bottom: 0; }
-    .gname { font-weight: 900; }
-    .gmeta { color: #475569; font-size: 14px; margin-top: 2px; }
-    .plist { margin: 6px 0 0; padding: 0; list-style: none; font-size: 15px; }
-    .plist li { padding: 3px 0; }
-    .empty { color: #64748B; text-align: center; padding: 10px; }
-  </style>
 </head>
 <body>
-  <header>
-    <h1>صفحة المسجد</h1>
-    <a href="ranking.html">الترتيب</a>
-  </header>
+  <div class="topbar"><div class="brand">صفحة المسجد</div><a class="btn ghost" href="app.html">الرئيسية</a></div>
 
-  <main>
+  <main class="wrap">
     <section class="card" id="top"><p class="empty">جاري التحميل...</p></section>
     <section class="card"><h2>الألعاب والطلاب</h2><div id="games"><p class="empty">جاري التحميل...</p></div></section>
   </main>

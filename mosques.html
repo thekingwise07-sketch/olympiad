@@ -5,45 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#1E3A8A">
   <title>إدارة المساجد</title>
+  <link rel="stylesheet" href="theme.css">
+  <script>(function(){document.documentElement.setAttribute("data-theme",localStorage.getItem("theme")||"dark");})();</script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
-  <style>
-    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; --red:#B91C1C; }
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; }
-    header { background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px; }
-    header h1 { margin: 0; font-size: 20px; font-weight: 900; }
-    header a { color: #fff; font-weight: 700; text-decoration: none; min-height: 48px; display: inline-flex; align-items: center; }
-    main { max-width: 640px; margin: 0 auto; padding: 16px; }
-    .card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 4px 16px rgba(30,58,138,.08); margin-bottom: 16px; }
-    h2 { margin: 0 0 12px; font-size: 19px; color: var(--blue); }
-    label { display: block; margin: 12px 0 6px; font-weight: 700; color: var(--blue); }
-    input { width: 100%; min-height: 48px; padding: 10px 14px; font: inherit; font-size: 16px; border: 1.5px solid #CBD5E1; border-radius: 12px; background: #fff; }
-    input[type="color"] { padding: 4px; height: 48px; }
-    input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,169,55,.25); }
-    button { min-height: 48px; padding: 0 16px; margin-top: 16px; font: inherit; font-weight: 700; font-size: 16px; background: var(--blue); color: #fff; border: 0; border-radius: 12px; cursor: pointer; }
-    button.ghost { background: #fff; color: var(--blue); border: 1.5px solid var(--blue); }
-    button.danger { background: var(--red); }
-    button:disabled { opacity: .6; cursor: default; }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .row button { margin-top: 0; flex: 1 1 auto; font-size: 15px; }
-    .err { color: var(--red); min-height: 22px; margin: 10px 0 0; font-size: 15px; }
-    .hidden { display: none !important; }
-    .item { display: flex; align-items: center; gap: 12px; border: 1.5px solid #E2E8F0; border-radius: 14px; padding: 12px; margin-bottom: 10px; }
-    .swatch { width: 40px; height: 40px; border-radius: 10px; flex: 0 0 40px; border: 2px solid #fff; box-shadow: 0 0 0 1px #CBD5E1; }
-    .item-name { font-weight: 900; font-size: 17px; flex: 1; }
-    .item-actions { display: flex; gap: 6px; }
-    .item-actions button { min-height: 40px; margin-top: 0; padding: 0 12px; font-size: 14px; }
-    .empty { color: #64748B; text-align: center; padding: 16px; }
-  </style>
 </head>
 <body>
 
-  <header>
-    <h1>إدارة المساجد</h1>
-    <a href="app.html">رجوع</a>
-  </header>
+  <div class="topbar"><div class="brand">إدارة المساجد</div><a class="btn ghost" href="app.html">الرئيسية</a></div>
 
-  <main>
+  <main class="wrap">
     <section class="card">
       <h2>طلبات فتح التعديل</h2>
       <div id="requestsList"><p class="empty">جاري التحميل...</p></div>
@@ -57,6 +27,9 @@
 
         <label for="color">لون المسجد</label>
         <input id="color" type="color" value="#1E3A8A">
+
+        <label for="logoFile">شعار المسجد (اختياري)</label>
+        <input id="logoFile" type="file" accept="image/*">
 
         <div class="row">
           <button id="saveBtn" type="submit">حفظ</button>
@@ -90,8 +63,18 @@
       if (box) box.textContent = "خطأ: " + (e.reason && (e.reason.code || e.reason.message) || "غير معروف");
     });
   </script>
+  <nav class="tabbar">
+    <a href="app.html" class=""><span class="ic">🏠</span>الرئيسية</a>
+    <a href="mosques.html" class="active"><span class="ic">🕌</span>المساجد</a>
+    <a href="games.html" class=""><span class="ic">🎯</span>الألعاب</a>
+    <a href="accounts.html" class=""><span class="ic">👤</span>الحسابات</a>
+    <a href="tools.html" class=""><span class="ic">🛠️</span>الأدوات</a>
+    <a href="log.html" class=""><span class="ic">🧾</span>السجل</a>
+  </nav>
+
   <script type="module">
     import { auth, db } from "./firebase.js";
+    import { compressLogo } from "./logo.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import {
       collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, where,
@@ -100,6 +83,12 @@
     const $ = (id) => document.getElementById(id);
     let me = null;
     let editingId = null;
+    let pendingLogo = null;
+    $("logoFile").addEventListener("change", async () => {
+      const f = $("logoFile").files[0];
+      if (!f) { pendingLogo = null; return; }
+      try { pendingLogo = await compressLogo(f); } catch (e) { alert(e.message); pendingLogo = null; }
+    });
 
     // ---------- حماية الصفحة: للآدمن فقط ----------
     onAuthStateChanged(auth, async (user) => {
@@ -148,7 +137,7 @@
 
     function renderMosque(id, m) {
       return el("div", { class: "item" }, [
-        el("div", { class: "swatch", style: { background: m.color || "#1E3A8A" } }),
+        m.logo ? el("img", { src: m.logo, alt: "", style: { width: "40px", height: "40px", borderRadius: "10px", objectFit: "cover", flex: "0 0 40px" } }) : el("div", { class: "swatch", style: { background: m.color || "#1E3A8A" } }),
         el("div", { class: "item-name", text: m.name || "-" }),
         el("div", { class: "item-actions" }, [
           el("button", { class: "ghost", type: "button", text: "تعديل", onclick: () => startEdit(id, m) }),
@@ -254,11 +243,11 @@
 
       try {
         if (editingId) {
-          await updateDoc(doc(db, "mosques", editingId), { name, color, updatedAt: serverTimestamp() });
+          await updateDoc(doc(db, "mosques", editingId), { name, color, ...(pendingLogo ? { logo: pendingLogo } : {}), updatedAt: serverTimestamp() });
           await audit("mosque.update", editingId, { name });
         } else {
           const ref = await addDoc(collection(db, "mosques"), {
-            name, color, locked: false, isTest: false,
+            name, color, ...(pendingLogo ? { logo: pendingLogo } : {}), locked: false, isTest: false,
             createdAt: serverTimestamp(), createdBy: me.uid,
           });
           await audit("mosque.create", ref.id, { name });

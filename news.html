@@ -5,44 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#1E3A8A">
   <title>الأخبار</title>
+  <link rel="stylesheet" href="theme.css">
+  <script>(function(){document.documentElement.setAttribute("data-theme",localStorage.getItem("theme")||"dark");})();</script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
-  <style>
-    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; --red:#B91C1C; }
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; padding-bottom: 84px; }
-    header { background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px; }
-    header h1 { margin: 0; font-size: 20px; font-weight: 900; }
-    header a { color: #fff; font-weight: 700; text-decoration: none; min-height: 48px; display: inline-flex; align-items: center; }
-    main { max-width: 640px; margin: 0 auto; padding: 16px; }
-    .card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 4px 16px rgba(30,58,138,.08); margin-bottom: 16px; }
-    h2 { margin: 0 0 12px; font-size: 19px; color: var(--blue); }
-    label { display: block; margin: 12px 0 6px; font-weight: 700; color: var(--blue); }
-    input, textarea { width: 100%; padding: 10px 14px; font: inherit; font-size: 16px; border: 1.5px solid #CBD5E1; border-radius: 12px; background: #fff; }
-    input { min-height: 48px; }
-    textarea { min-height: 120px; resize: vertical; line-height: 1.8; }
-    input:focus, textarea:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,169,55,.25); }
-    button { min-height: 48px; padding: 0 16px; margin-top: 12px; font: inherit; font-weight: 700; font-size: 16px; background: var(--blue); color: #fff; border: 0; border-radius: 12px; cursor: pointer; }
-    button.ghost { background: #fff; color: var(--blue); border: 1.5px solid var(--blue); }
-    button.danger { background: var(--red); }
-    button:disabled { opacity: .5; cursor: default; }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .row button { margin-top: 0; flex: 1 1 auto; font-size: 15px; }
-    .err { color: var(--red); min-height: 22px; margin: 10px 0 0; font-size: 15px; }
-    .hidden { display: none !important; }
-    .news { border: 1.5px solid #E2E8F0; border-radius: 14px; padding: 14px; margin-bottom: 12px; }
-    .news-title { font-weight: 900; font-size: 18px; color: var(--blue); }
-    .news-date { color: #64748B; font-size: 13px; margin: 4px 0 10px; }
-    .news-body { white-space: pre-wrap; line-height: 1.9; font-size: 16px; }
-    .empty { color: #64748B; text-align: center; padding: 16px; }
-  </style>
 </head>
 <body>
-  <header>
-    <h1>الأخبار</h1>
-    <a href="app.html">رجوع</a>
-  </header>
+  <div class="topbar"><div class="brand">الأخبار</div><a class="btn ghost" href="app.html">الرئيسية</a></div>
 
-  <main>
+  <main class="wrap">
     <section class="card hidden" id="formCard">
       <h2 id="formTitle">خبر جديد</h2>
       <form id="newsForm" autocomplete="off" onsubmit="return false;">
@@ -64,14 +34,13 @@
     </section>
   </main>
 
-  <nav>
-    <a href="home.html">الرئيسية</a>
-    <a href="matches-public.html">المباريات</a>
-    <a href="ranking.html">الترتيب</a>
-    <a href="mosques-public.html">المساجد</a>
-    <a href="news.html">الأخبار</a>
-    <a href="rules.html">القوانين</a>
-    <a href="index.html">دخول</a>
+  <nav class="tabbar">
+    <a href="app.html" class=""><span class="ic">🏠</span>الرئيسية</a>
+    <a href="matches-public.html" class=""><span class="ic">⚽</span>المباريات</a>
+    <a href="ranking.html" class=""><span class="ic">🏆</span>الترتيب</a>
+    <a href="mosques-public.html" class=""><span class="ic">🕌</span>المساجد</a>
+    <a href="news.html" class="active"><span class="ic">📰</span>الأخبار</a>
+    <a href="rules.html" class=""><span class="ic">📜</span>القوانين</a>
   </nav>
   <script type="module">
     import { auth, db, tf } from "./firebase.js";
