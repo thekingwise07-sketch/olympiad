@@ -95,6 +95,7 @@
           ? "الحساب ما له ملف، كلّم الآدمن"
           : "هذا الحساب معطّل، كلّم الآدمن";
         $("loginBtn").disabled = false;
+        $("loginBtn").textContent = "دخول";
         return;
       }
       if (p.mustChange) {
@@ -106,12 +107,13 @@
 
     // جلسة محفوظة من قبل
     onAuthStateChanged(auth, (user) => {
-      if (user) routeUser(user).catch((e) => { $("loginErr").textContent = "ما قدرنا نتحقق من الحساب: " + (e.code || e.message); });
+      if (user) routeUser(user).catch((e) => { $("loginErr").textContent = "ما قدرنا نتحقق من الحساب: " + (e.code || e.message); $("loginBtn").disabled = false; $("loginBtn").textContent = "دخول"; });
     });
 
     $("loginForm").addEventListener("submit", async (ev) => {
       ev.preventDefault();
       $("loginBtn").disabled = true;
+      $("loginBtn").textContent = "جاري الدخول...";
       $("loginErr").textContent = "";
       try {
         const username = $("username").value.trim().toLowerCase();
@@ -120,6 +122,7 @@
       } catch (e) {
         $("loginErr").textContent = errorText(e);
         $("loginBtn").disabled = false;
+        $("loginBtn").textContent = "دخول";
       }
     });
 
