@@ -66,6 +66,8 @@
         <select id="mosqueSelect"></select>
       </div>
       <p id="mosqueName" class="item-name"></p>
+      <button id="lockBtn" type="button" class="danger hidden">اعتماد التسجيل وقفل المسجد</button>
+      <p id="lockErr" class="err"></p>
       <p id="maxInfo" class="item-meta"></p>
     </section>
 
@@ -167,10 +169,24 @@
       mosqueLocked = m.locked === true;
       $("mosqueName").textContent = m.name || id;
       $("lockNotice").classList.toggle("hidden", !mosqueLocked);
+      $("lockBtn").classList.toggle("hidden", mosqueLocked || me.role !== "mosque_supervisor");
       resetForm();
       await loadGames();
       await loadStudents();
     }
+
+
+    $("lockBtn").addEventListener("click", async () => {
+      $("lockErr").textContent = "";
+      if (!confirm("متأكد؟ ما تقدر تعدّل بعدها، إلا بإذن الآدمن.")) return;
+      try {
+        await updateDoc(doc(db, "mosques", mosqueId), { locked: true, lockedAt: serverTimestamp(), lockedBy: me.uid });
+        mosquesMap[mosqueId] = { ...(mosquesMap[mosqueId] || {}), locked: true };
+        await selectMosque(mosqueId);
+      } catch (e) {
+        $("lockErr").textContent = errText(e);
+      }
+    });
 
     // ---------- الإعدادات ----------
     async function loadLimit() {

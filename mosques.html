@@ -37,12 +37,11 @@
   </style>
 </head>
 <body>
+
   <header>
     <h1>إدارة المساجد</h1>
     <a href="app.html">رجوع</a>
   </header>
-
-  <p id="status" style="margin:0;padding:8px 16px;background:#E0E7FF;color:#1E3A8A;font-size:14px;font-weight:700">جاري فحص الكود...</p>
 
   <main>
     <section class="card">
@@ -87,7 +86,6 @@
     });
   </script>
   <script type="module">
-    document.getElementById("status").textContent = "الكود اشتغل ✅";
     import { auth, db } from "./firebase.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import {
@@ -149,8 +147,22 @@
         el("div", { class: "item-actions" }, [
           el("button", { class: "ghost", type: "button", text: "تعديل", onclick: () => startEdit(id, m) }),
           el("button", { class: "danger", type: "button", text: "حذف", onclick: () => removeMosque(id, m) }),
+          ...(m.locked === true ? [el("button", { class: "ghost", type: "button", text: "فتح القفل", onclick: () => unlockMosque(id, m) })] : []),
         ]),
+        ...(m.locked === true ? [el("div", { class: "item-name", style: { color: "#B91C1C", fontSize: "14px" }, text: "مقفول: التسجيل معتمد" })] : []),
       ]);
+    }
+
+
+    async function unlockMosque(id, m) {
+      if (!confirm("فتح القفل لمسجد (" + (m.name || "") + ")؟ المشرف يقدر يعدّل التسجيل بعدها.")) return;
+      try {
+        await updateDoc(doc(db, "mosques", id), { locked: false, unlockedAt: serverTimestamp() });
+        await audit("mosque.unlock", id, { name: m.name || "" });
+        await loadMosques();
+      } catch (e) {
+        alert(errText(e));
+      }
     }
 
     // ---------- الفورم ----------
