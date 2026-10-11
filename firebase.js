@@ -37,7 +37,10 @@ export const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 export function usernameToEmail(username) {
-  return `${username}@${DOMAIN}`;
+  const v = String(username || "").trim().toLowerCase();
+  // إذا المستخدم كتب إيميل كامل، نستخدمه كما هو
+  if (v.includes("@")) return v;
+  return `${v}@${DOMAIN}`;
 }
 
 // كلمة سر عشوائية (تُعرض مرة وحدة للآدمن ولا تنحفظ)
