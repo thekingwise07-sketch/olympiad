@@ -138,7 +138,7 @@
       return node;
     }
 
-    const errText = (e) => e?.message || "صار خطأ، حاول مرة ثانية";
+    const errText = (e) => (e?.code ? "[" + e.code + "] " : "") + (e?.message || "صار خطأ، حاول مرة ثانية");
 
     function fillSelect(select, entries, emptyLabel) {
       select.innerHTML = "";
