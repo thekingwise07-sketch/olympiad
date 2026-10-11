@@ -36,7 +36,7 @@
   </nav>
 
   <script type="module">
-    import { db } from "./firebase.js";
+    import { db, tf } from "./firebase.js";
     import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const $ = (id) => document.getElementById(id);
@@ -49,10 +49,10 @@
 
     async function load() {
       const [gSnap, mSnap, pSnap, mtSnap] = await Promise.all([
-        getDocs(query(collection(db, "games"), where("isTest", "==", false))),
-        getDocs(query(collection(db, "mosques"), where("isTest", "==", false))),
-        getDocs(query(collection(db, "players"), where("isTest", "==", false))),
-        getDocs(query(collection(db, "matches"), where("isTest", "==", false), where("status", "==", "final"))),
+        getDocs(query(collection(db, "games"), ...tf())),
+        getDocs(query(collection(db, "mosques"), ...tf())),
+        getDocs(query(collection(db, "players"), ...tf())),
+        getDocs(query(collection(db, "matches"), ...tf(), where("status", "==", "final"))),
       ]);
       const games = Object.fromEntries(gSnap.docs.map((d) => [d.id, d.data()]));
       const mosques = Object.fromEntries(mSnap.docs.map((d) => [d.id, d.data()]));

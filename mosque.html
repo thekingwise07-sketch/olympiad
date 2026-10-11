@@ -44,7 +44,7 @@
   </main>
 
   <script type="module">
-    import { db } from "./firebase.js";
+    import { db, tf } from "./firebase.js";
     import { doc, getDoc, getDocs, collection, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const $ = (id) => document.getElementById(id);
@@ -73,12 +73,13 @@
       }
       const m = mSnap.data();
 
+      const tSnap = await getDocs(query(collection(db, "teams"), where("mosqueId", "==", id), ...tf()));
       const [gSnap, pSnap, mtSnap, sSnap, msSnap] = await Promise.all([
-        getDocs(query(collection(db, "games"), where("isTest", "==", false))),
-        getDocs(query(collection(db, "players"), where("mosqueId", "==", id), where("isTest", "==", false))),
-        getDocs(query(collection(db, "matches"), where("isTest", "==", false), where("status", "==", "final"))),
+        getDocs(query(collection(db, "games"), ...tf())),
+        getDocs(query(collection(db, "players"), where("mosqueId", "==", id), ...tf())),
+        getDocs(query(collection(db, "matches"), ...tf(), where("status", "==", "final"))),
         getDoc(doc(db, "settings", "points")),
-        getDocs(query(collection(db, "mosques"), where("isTest", "==", false))),
+        getDocs(query(collection(db, "mosques"), ...tf())),
       ]);
       const games = Object.fromEntries(gSnap.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
       const mosques = Object.fromEntries(msSnap.docs.map((d) => [d.id, d.data()]));
@@ -120,6 +121,22 @@
       ]);
       $("top").appendChild(top);
       $("top").appendChild(stats);
+
+      // الفرق: اسم الفريق + مشرفه + لاعبيه
+      const teamsBox = document.createElement("div");
+      teamsBox.className = "card";
+      teamsBox.innerHTML = "<h2>الفرق</h2>";
+      const teams = tSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      if (!teams.length) teamsBox.appendChild(el("p", { class: "empty", text: "ما في فرق بعد" }));
+      teams.forEach((t) => {
+        const members = players.filter((p) => p.teamId === t.id);
+        teamsBox.appendChild(el("div", { class: "game" }, [
+          el("div", { class: "gname", text: t.name || "-" }),
+          el("div", { class: "gmeta", text: "مشرف الفريق: " + (t.supervisorName || "-") + " · " + members.length + " لاعب" }),
+          members.length ? el("ul", { class: "plist" }, members.map((p) => el("li", { text: p.name || "-" }))) : el("div", { class: "gmeta", text: "ما في لاعبين" }),
+        ]));
+      });
+      $("top").parentElement.insertBefore(teamsBox, $("games").closest(".card"));
 
       // الألعاب والطلاب المسجلين في كل لعبة
       const gBox = $("games");

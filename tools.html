@@ -59,7 +59,9 @@
         <h2>البيانات التجريبية (البروفا)</h2>
         <p class="hint">البيانات التجريبية مخفية عن الزوار وكل الأدوار. تقدر تنشئها للتجربة، وتمسحها بعدين. قبل المسح ينزل ملف نسخة أمان تلقائياً.</p>
         <div class="row">
-          <button id="seedBtn" type="button">إنشاء بيانات تجريبية</button>
+          <label class="switch"><input id="proofOn" type="checkbox"> وضع البروفا (أشوف البيانات التجريبية في كل الصفحات)</label>
+        <p id="proofMsg" class="msg"></p>
+        <button id="seedBtn" type="button">إنشاء بيانات تجريبية كاملة</button>
           <button id="backupBtn" type="button" class="ghost">تنزيل نسخة أمان</button>
         </div>
         <hr class="hr">
@@ -84,7 +86,7 @@
 
     const $ = (id) => document.getElementById(id);
     let me = null;
-    const TEST_COLLECTIONS = ["mosques", "games", "players", "matches"];
+    const TEST_COLLECTIONS = ["mosques", "games", "teams", "players", "matches"];
 
     onAuthStateChanged(auth, async (user) => {
       if (!user) return location.replace("index.html");
@@ -159,26 +161,86 @@
       }
     });
 
-    // ---------- إنشاء بيانات تجريبية ----------
+    // ---------- وضع البروفا ----------
+    $("proofOn").checked = localStorage.getItem("proofMode") === "1";
+    $("proofOn").addEventListener("change", () => {
+      localStorage.setItem("proofMode", $("proofOn").checked ? "1" : "0");
+      $("proofMsg").className = "msg ok";
+      $("proofMsg").textContent = "تم. افتح أي صفحة أو حدّثها لتظهر البيانات.";
+    });
+
+    // ---------- إنشاء بيانات تجريبية كاملة ----------
     $("seedBtn").addEventListener("click", async () => {
-      if (!confirm("إنشاء بيانات تجريبية؟ (مسجدين، لعبة، طالبين، ومباراة)")) return;
+      if (!confirm("إنشاء بيانات تجريبية كاملة؟ (4 مساجد، 4 ألعاب، فرق، لاعبين، ومباريات بنتائج)")) return;
       $("seedBtn").disabled = true;
       const out = $("testMsg");
       out.className = "msg";
       try {
-        const mA = await addDoc(collection(db, "mosques"), { name: "مسجد تجريبي أ", color: "#7C3AED", locked: false, isTest: true });
-        const mB = await addDoc(collection(db, "mosques"), { name: "مسجد تجريبي ب", color: "#0F766E", locked: false, isTest: true });
-        const g = await addDoc(collection(db, "games"), { name: "دوري تجريبي", type: "football", maxPlayers: 10, archived: false, isTest: true });
-        await addDoc(collection(db, "players"), { name: "طالب تجريبي 1", mosqueId: mA.id, games: [g.id], isTest: true });
-        await addDoc(collection(db, "players"), { name: "طالب تجريبي 2", mosqueId: mB.id, games: [g.id], isTest: true });
-        await addDoc(collection(db, "matches"), {
-          gameId: g.id, mosqueA: mA.id, mosqueB: mB.id, scoreA: 2, scoreB: 1,
-          status: "final", organizerUid: me.uid, isTest: true,
-          createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        const mk = (c, data) => addDoc(collection(db, c), { ...data, isTest: true, createdAt: serverTimestamp() });
+        const mNames = ["مسجد الهدى", "مسجد النور", "مسجد الرحمن", "مسجد التقوى"];
+        const mColors = ["#7C3AED", "#0F766E", "#B45309", "#BE123C"];
+        const M = [];
+        for (let i = 0; i < 4; i++) M.push(await mk("mosques", { name: mNames[i] + " (تجريبي)", color: mColors[i], locked: false }));
+
+        const gFoot = await mk("games", { name: "دوري كرة القدم التجريبي", type: "football", maxPlayers: 15, archived: false });
+        const gVol = await mk("games", { name: "دوري الطائرة التجريبي", type: "volleyball", maxPlayers: 12, archived: false });
+        const gSpr = await mk("games", { name: "سباق الضاحية التجريبي", type: "sprint", maxPlayers: 20, archived: false });
+        const gChs = await mk("games", { name: "بطولة الشطرنج التجريبية", type: "chess", maxPlayers: 8, archived: false });
+
+        // فرق: فريقين لكل مسجد، مع مشرف لكل فريق
+        const T = [];
+        for (let i = 0; i < 4; i++) {
+          const a = await mk("teams", { name: "فريق أ", supervisorName: "مشرف تجريبي " + (i * 2 + 1), mosqueId: M[i].id });
+          const b = await mk("teams", { name: "فريق ب", supervisorName: "مشرف تجريبي " + (i * 2 + 2), mosqueId: M[i].id });
+          T.push([a.id, b.id]);
+        }
+
+        // لاعبين: 4 لكل مسجد، موزعين على الفرق
+        const P = [];
+        for (let i = 0; i < 4; i++) {
+          P.push([]);
+          for (let k = 0; k < 4; k++) {
+            const games = [gFoot.id, gSpr.id];
+            if (k < 2) games.push(gVol.id);
+            if (k === 0) games.push(gChs.id);
+            const pl = await mk("players", { name: "لاعب " + (i + 1) + "-" + (k + 1), mosqueId: M[i].id, games, teamId: T[i][k % 2] });
+            P[i].push({ id: pl.id, name: "لاعب " + (i + 1) + "-" + (k + 1) });
+          }
+        }
+
+        // كرة القدم: توزيع الأهداف على لاعبين المسجد
+        const footMatch = async (i, j, gi, gj, status) => {
+          const players = {};
+          const spread = (list, total) => {
+            list.forEach((p) => { players[p.id] = { goals: 0, yellow: Math.random() < 0.3 ? 1 : 0, red: 0, fouls: Math.floor(Math.random() * 3) }; });
+            for (let g = 0; g < total; g++) players[list[g % list.length].id].goals++;
+          };
+          spread(P[i], gi);
+          spread(P[j], gj);
+          await mk("matches", { gameId: gFoot.id, mosqueA: M[i].id, mosqueB: M[j].id, scoreA: gi, scoreB: gj, status, organizerUid: me.uid, details: { players } });
+        };
+        await footMatch(0, 1, 3, 1, "final");
+        await footMatch(2, 3, 2, 2, "final");
+        await footMatch(0, 3, 0, 0, "draft");
+
+        // الطائرة: 3 أشواط
+        await mk("matches", {
+          gameId: gVol.id, mosqueA: M[0].id, mosqueB: M[2].id, scoreA: 2, scoreB: 1, status: "final", organizerUid: me.uid,
+          details: { sets: [{ a: 25, b: 20 }, { a: 22, b: 25 }, { a: 25, b: 18 }] },
         });
-        await audit("test.seed", {});
+
+        // الضاحية: ترتيب المتسابقين
+        await mk("matches", {
+          gameId: gSpr.id, mosqueA: "", mosqueB: "", scoreA: 0, scoreB: 0, status: "final", organizerUid: me.uid,
+          details: { ranking: [P[0][0], P[1][0], P[2][0], P[3][0]].map((p, idx) => ({ name: p.name, mosqueId: M[idx].id })) },
+        });
+
+        // الشطرنج: فوز أو خسارة
+        await mk("matches", { gameId: gChs.id, mosqueA: M[1].id, mosqueB: M[3].id, scoreA: 1, scoreB: 0, status: "final", organizerUid: me.uid });
+
+        await audit("test.seed", { mosques: 4, games: 4, teams: 8, players: 16, matches: 6 });
         out.classList.add("ok");
-        out.textContent = "تم إنشاء البيانات التجريبية";
+        out.textContent = "تم: 4 مساجد، 4 ألعاب، 8 فرق، 16 لاعب، و6 مباريات بنتائج. فعّل وضع البروفا لتشوفها.";
       } catch (e) {
         out.classList.add("err");
         out.textContent = errText(e);

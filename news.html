@@ -65,7 +65,7 @@
   </main>
 
   <script type="module">
-    import { auth, db } from "./firebase.js";
+    import { auth, db, tf } from "./firebase.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -105,7 +105,7 @@
     }
 
     async function loadNews() {
-      const snap = await getDocs(query(collection(db, "news"), where("isTest", "==", false)));
+      const snap = await getDocs(query(collection(db, "news"), ...tf()));
       const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       const list = $("list");

@@ -98,7 +98,7 @@
   </main>
 
   <script type="module">
-    import { auth, db } from "./firebase.js";
+    import { auth, db, tf } from "./firebase.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { collection, doc, getDoc, getDocs, updateDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -135,7 +135,7 @@
       game = gSnap.exists() ? { id: gSnap.id, ...gSnap.data() } : {};
       if (!["football", "volleyball", "sprint"].includes(game.type)) return bad("تفاصيل هذي اللعبة تنضاف لاحقاً. النتيجة تُدخل من صفحة المباريات");
 
-      const ms = await getDocs(query(collection(db, "mosques"), where("isTest", "==", false)));
+      const ms = await getDocs(query(collection(db, "mosques"), ...tf()));
       mosquesMap = Object.fromEntries(ms.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
       if (game.type === "sprint") {
         document.querySelectorAll(".teams2, #footballCard, #volleyCard, #teams, #statusTxt").forEach((n) => n.classList.add("hidden"));
@@ -178,7 +178,7 @@
     // ---------- لاعبين المسجد اللي مسجلين باللعبة ----------
     async function loadPlayers() {
       const load = async (mid) => {
-        const snap = await getDocs(query(collection(db, "players"), where("mosqueId", "==", mid), where("isTest", "==", false)));
+        const snap = await getDocs(query(collection(db, "players"), where("mosqueId", "==", mid), ...tf()));
         return snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((s) => (s.games || []).includes(match.gameId));
       };
       players.A = await load(match.mosqueA);

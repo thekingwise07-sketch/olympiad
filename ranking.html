@@ -7,7 +7,7 @@
   <title>الترتيب</title>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
   <style>
-    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; --red:#B91C1C; }
+    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; --red:#B91C1C; --green:#166534; }
     * { box-sizing: border-box; }
     body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; }
     header { background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px; }
@@ -23,25 +23,29 @@
     .hidden { display: none !important; }
     .msg { min-height: 22px; margin: 10px 0 0; font-size: 15px; }
     .err { color: var(--red); }
-    .ok { color: #166534; }
-    .pts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .ok { color: var(--green); }
+    .pts-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; align-items: center; margin-top: 8px; }
     .pts-grid div { font-weight: 700; color: var(--blue); font-size: 14px; }
-    .row { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid #E2E8F0; }
+    .row { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid #E2E8F0; cursor: pointer; }
     .rank { width: 30px; font-weight: 900; font-size: 18px; color: var(--blue); text-align: center; flex: 0 0 30px; }
+    .move { width: 42px; font-weight: 900; font-size: 14px; text-align: center; flex: 0 0 42px; }
+    .up { color: var(--green); }
+    .down { color: var(--red); }
+    .flat { color: #94A3B8; }
     .info { flex: 1; min-width: 0; }
     .name { font-weight: 900; font-size: 16px; display: flex; align-items: center; gap: 8px; }
     .dot { width: 14px; height: 14px; border-radius: 4px; flex: 0 0 14px; }
     .bar-wrap { height: 14px; background: #E2E8F0; border-radius: 999px; margin-top: 8px; overflow: hidden; }
     .bar { height: 100%; border-radius: 999px; width: 0; transition: width .8s ease; }
     .meta { color: #475569; font-size: 13px; margin-top: 4px; }
-    .pts { font-size: 22px; font-weight: 900; color: var(--gold); direction: ltr; min-width: 46px; text-align: right; }
+    .pts { font-size: 22px; font-weight: 900; color: var(--gold); direction: ltr; min-width: 52px; text-align: right; }
     .empty { color: #64748B; text-align: center; padding: 16px; }
   </style>
 </head>
 <body>
   <header>
     <h1>الترتيب</h1>
-    <a href="app.html">رجوع</a>
+    <a href="home.html">رجوع</a>
   </header>
 
   <main>
@@ -49,20 +53,27 @@
       <h2>لوحة سباق المساجد</h2>
       <label for="gameFilter">عرض حسب اللعبة</label>
       <select id="gameFilter"><option value="">كل الألعاب</option></select>
-      <div id="board" style="margin-top:12px"><p class="empty">جاري التحميل...</p></div>
+      <div id="board" style="margin-top:8px"><p class="empty">جاري التحميل...</p></div>
     </section>
 
     <section class="card hidden" id="pointsCard">
       <h2>نقاط الألعاب (للآدمن)</h2>
       <div class="pts-grid"><div>اللعبة</div><div>فوز</div><div>تعادل</div></div>
       <div id="pointsInputs"></div>
+      <label>نقاط الضاحية: المراكز الأربعة الأولى (والباقي 1)</label>
+      <div class="pts-grid" style="grid-template-columns:repeat(4,1fr)">
+        <input id="sp1" type="number" min="0" max="99" dir="ltr">
+        <input id="sp2" type="number" min="0" max="99" dir="ltr">
+        <input id="sp3" type="number" min="0" max="99" dir="ltr">
+        <input id="sp4" type="number" min="0" max="99" dir="ltr">
+      </div>
       <button id="savePointsBtn" type="button">حفظ النقاط</button>
       <p id="pointsMsg" class="msg"></p>
     </section>
   </main>
 
   <script type="module">
-    import { auth, db } from "./firebase.js";
+    import { auth, db, tf } from "./firebase.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { collection, doc, getDoc, getDocs, setDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -72,11 +83,12 @@
       football: { win: 3, draw: 1, loss: 0 },
       volleyball: { win: 3, draw: 1, loss: 0 },
       chess: { win: 3, draw: 1, loss: 0 },
+      sprintPlaces: [10, 7, 5, 3],
     };
 
-    let games = {};        // gameId -> game
-    let mosques = {};      // mosqueId -> mosque
-    let finals = [];       // final matches
+    let games = {};
+    let mosques = {};
+    let finals = [];
     let points = DEFAULT_POINTS;
     let isAdmin = false;
 
@@ -93,6 +105,7 @@
     }
 
     onAuthStateChanged(auth, async (user) => {
+      isAdmin = false;
       if (user) {
         const snap = await getDoc(doc(db, "users", user.uid));
         const p = snap.exists() ? snap.data() : null;
@@ -104,14 +117,15 @@
 
     async function loadAll() {
       const [gSnap, mSnap, sSnap, mtSnap] = await Promise.all([
-        getDocs(query(collection(db, "games"), where("isTest", "==", false))),
-        getDocs(query(collection(db, "mosques"), where("isTest", "==", false))),
+        getDocs(query(collection(db, "games"), ...tf())),
+        getDocs(query(collection(db, "mosques"), ...tf())),
         getDoc(doc(db, "settings", "points")),
-        getDocs(query(collection(db, "matches"), where("isTest", "==", false), where("status", "==", "final"))),
+        getDocs(query(collection(db, "matches"), ...tf(), where("status", "==", "final"))),
       ]);
       games = Object.fromEntries(gSnap.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
       mosques = Object.fromEntries(mSnap.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
-      points = sSnap.exists() ? { ...DEFAULT_POINTS, ...sSnap.data() } : DEFAULT_POINTS;
+      const saved = sSnap.exists() ? sSnap.data() : {};
+      points = { ...DEFAULT_POINTS, ...saved };
       finals = mtSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
       const sel = $("gameFilter");
@@ -127,46 +141,77 @@
 
     $("gameFilter").addEventListener("change", renderBoard);
 
-    // ---------- حساب الترتيب من المباريات النهائية فقط ----------
+    // ---------- الحساب: مباريات (فوز/تعادل/خسارة) + الضاحية (حسب المراكز) ----------
     function computeStandings(gameFilter) {
       const table = {};
-      const ensure = (id) => (table[id] ||= { id, pts: 0, win: 0, draw: 0, loss: 0 });
+      const ensure = (id) => (table[id] ||= { id, pts: 0, win: 0, draw: 0, loss: 0, gd: 0 });
+      const places = points.sprintPlaces || DEFAULT_POINTS.sprintPlaces;
 
       finals.forEach((m) => {
         if (gameFilter && m.gameId !== gameFilter) return;
         const game = games[m.gameId];
         if (!game) return;
+
+        if (game.type === "sprint") {
+          (m.details?.ranking || []).forEach((entry, i) => {
+            if (!entry.mosqueId) return;
+            const t = ensure(entry.mosqueId);
+            t.pts += places[i] ?? 1;
+          });
+          return;
+        }
+
+        if (!m.mosqueA || !m.mosqueB) return;
         const cfg = points[game.type] || DEFAULT_POINTS[game.type] || { win: 0, draw: 0, loss: 0 };
         const a = ensure(m.mosqueA);
         const b = ensure(m.mosqueB);
-        if (m.scoreA > m.scoreB) {
-          a.pts += cfg.win; a.win++; b.pts += cfg.loss; b.loss++;
-        } else if (m.scoreA < m.scoreB) {
-          b.pts += cfg.win; b.win++; a.pts += cfg.loss; a.loss++;
-        } else {
-          a.pts += cfg.draw; a.draw++; b.pts += cfg.draw; b.draw++;
-        }
+        if (m.scoreA > m.scoreB) { a.pts += cfg.win; a.win++; b.pts += cfg.loss; b.loss++; }
+        else if (m.scoreA < m.scoreB) { b.pts += cfg.win; b.win++; a.pts += cfg.loss; a.loss++; }
+        else { a.pts += cfg.draw; a.draw++; b.pts += cfg.draw; b.draw++; }
+        a.gd += (m.scoreA || 0) - (m.scoreB || 0);
+        b.gd += (m.scoreB || 0) - (m.scoreA || 0);
       });
 
-      return Object.values(table).sort((x, y) => y.pts - x.pts || y.win - x.win);
+      return Object.values(table).sort((x, y) => y.pts - x.pts || y.win - x.win || y.gd - x.gd);
     }
+
+    // ---------- الأسهم: مقارنة بآخر عرض على هالجهاز ----------
+    function snapKey() { return "rankSnap_" + ($("gameFilter").value || "all"); }
 
     function renderBoard() {
       const board = $("board");
       board.innerHTML = "";
-      const gameFilter = $("gameFilter").value;
-      const rows = computeStandings(gameFilter);
+      const rows = computeStandings($("gameFilter").value);
       if (!rows.length) {
-        board.appendChild(el("p", { class: "empty", text: "ما في مباريات نهائية بعد" }));
+        board.appendChild(el("p", { class: "empty", text: "ما في نتائج نهائية بعد" }));
         return;
       }
+
+      let prev = {};
+      try { prev = JSON.parse(localStorage.getItem(snapKey()) || "{}"); } catch (e) { prev = {}; }
+      const prevRanks = prev.ranks || {};
+      const prevPts = prev.pts || {};
+
       const max = Math.max(1, ...rows.map((r) => r.pts));
       rows.forEach((r, i) => {
         const m = mosques[r.id] || {};
         const color = m.color || "#1E3A8A";
         const bar = el("div", { class: "bar", style: { background: color, width: "0%" } });
-        board.appendChild(el("div", { class: "row", style: { cursor: "pointer" }, onclick: () => { location.href = "mosque.html?id=" + r.id; } }, [
+        const ptsEl = el("div", { class: "pts", text: String(prevPts[r.id] ?? r.pts) });
+
+        let moveEl;
+        if (prevRanks[r.id] == null) {
+          moveEl = el("div", { class: "move flat", text: "جديد" });
+        } else {
+          const diff = prevRanks[r.id] - (i + 1);
+          if (diff > 0) moveEl = el("div", { class: "move up", text: "▲" + diff });
+          else if (diff < 0) moveEl = el("div", { class: "move down", text: "▼" + Math.abs(diff) });
+          else moveEl = el("div", { class: "move flat", text: "–" });
+        }
+
+        board.appendChild(el("div", { class: "row", onclick: () => { location.href = "mosque.html?id=" + r.id; } }, [
           el("div", { class: "rank", text: String(i + 1) }),
+          moveEl,
           el("div", { class: "info" }, [
             el("div", { class: "name" }, [
               m.logo ? el("img", { src: m.logo, alt: "", style: { width: "26px", height: "26px", borderRadius: "8px", objectFit: "cover" } }) : el("span", { class: "dot", style: { background: color } }),
@@ -175,10 +220,28 @@
             el("div", { class: "bar-wrap" }, [bar]),
             el("div", { class: "meta", text: "فوز " + r.win + " · تعادل " + r.draw + " · خسارة " + r.loss }),
           ]),
-          el("div", { class: "pts", text: String(r.pts) }),
+          ptsEl,
         ]));
-        requestAnimationFrame(() => setTimeout(() => { bar.style.width = (r.pts / max * 100) + "%"; }, 50));
+
+        // عدّ سلس من القيمة السابقة للجديدة
+        const from = prevPts[r.id] ?? 0;
+        const to = r.pts;
+        const start = performance.now();
+        const dur = 800;
+        const tick = (now) => {
+          const k = Math.min(1, (now - start) / dur);
+          ptsEl.textContent = String(Math.round(from + (to - from) * k));
+          if (k < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+        setTimeout(() => { bar.style.width = (r.pts / max * 100) + "%"; }, 50);
       });
+
+      // حفظ الترتيب الحالي للمقارنة في المرة الجاية
+      const ranks = {};
+      const pts = {};
+      rows.forEach((r, i) => { ranks[r.id] = i + 1; pts[r.id] = r.pts; });
+      localStorage.setItem(snapKey(), JSON.stringify({ ranks, pts }));
     }
 
     // ---------- نقاط الألعاب (للآدمن) ----------
@@ -193,6 +256,8 @@
           el("input", { type: "number", min: "0", max: "99", value: cfg.draw, id: type + "Draw", dir: "ltr" }),
         ]));
       });
+      const sp = points.sprintPlaces || DEFAULT_POINTS.sprintPlaces;
+      ["sp1", "sp2", "sp3", "sp4"].forEach((id, i) => { $(id).value = sp[i] ?? 0; });
     }
 
     $("savePointsBtn").addEventListener("click", async () => {
@@ -208,6 +273,13 @@
         }
         out[type] = { win, draw, loss: 0 };
       }
+      const sprintPlaces = ["sp1", "sp2", "sp3", "sp4"].map((id) => Number($(id).value));
+      if (!sprintPlaces.every((v) => Number.isInteger(v) && v >= 0 && v <= 99)) {
+        $("pointsMsg").classList.add("err");
+        $("pointsMsg").textContent = "نقاط الضاحية لازم تكون أرقام بين 0 و99";
+        return;
+      }
+      out.sprintPlaces = sprintPlaces;
       try {
         await setDoc(doc(db, "settings", "points"), { ...out, updatedAt: serverTimestamp() }, { merge: true });
         points = { ...DEFAULT_POINTS, ...out };
@@ -220,6 +292,5 @@
       }
     });
   </script>
-  <script type="module" src="maintenance.js"></script>
 </body>
 </html>

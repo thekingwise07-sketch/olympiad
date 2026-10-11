@@ -86,7 +86,7 @@
   </main>
 
   <script type="module">
-    import { auth, db } from "./firebase.js";
+    import { auth, db, tf } from "./firebase.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -107,11 +107,11 @@
       }
       me = { uid: user.uid, ...p };
 
-      const gSnap = await getDocs(query(collection(db, "games"), where("isTest", "==", false)));
+      const gSnap = await getDocs(query(collection(db, "games"), ...tf()));
       games = gSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((g) => !g.archived);
       if (me.role === "organizer") games = games.filter((g) => g.id === me.gameId);
 
-      const mSnap = await getDocs(query(collection(db, "mosques"), where("isTest", "==", false)));
+      const mSnap = await getDocs(query(collection(db, "mosques"), ...tf()));
       mosquesMap = Object.fromEntries(mSnap.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
 
       if (!games.length) {
@@ -165,7 +165,7 @@
 
     // ---------- قائمة المباريات ----------
     async function loadMatches() {
-      const snap = await getDocs(query(collection(db, "matches"), where("isTest", "==", false)));
+      const snap = await getDocs(query(collection(db, "matches"), ...tf()));
       matches = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       if (me.role === "organizer") matches = matches.filter((m) => m.gameId === me.gameId);
       renderMatches();

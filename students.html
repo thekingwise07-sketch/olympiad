@@ -66,6 +66,10 @@
         <select id="mosqueSelect"></select>
       </div>
       <p id="mosqueName" class="item-name"></p>
+      <div id="logoBox" class="row" style="align-items:center;margin-top:8px"></div>
+      <label for="logoUp" class="item-meta">تغيير شعار المسجد</label>
+      <input id="logoUp" type="file" accept="image/*" style="width:100%;min-height:48px">
+      <p id="logoMsg" class="item-meta"></p>
       <button id="lockBtn" type="button" class="danger hidden">اعتماد التسجيل وقفل المسجد</button>
       <p id="lockErr" class="err"></p>
       <button id="reqBtn" type="button" class="ghost hidden">طلب فتح التعديل من الآدمن</button>
@@ -84,6 +88,9 @@
         <label for="studentName">اسم الطالب</label>
         <input id="studentName" maxlength="60">
 
+        <label for="teamSelect">الفريق (اختياري)</label>
+        <select id="teamSelect" style="width:100%;min-height:48px;padding:10px 14px;font:inherit;font-size:16px;border:1.5px solid #CBD5E1;border-radius:12px"></select>
+
         <label>الألعاب المسجّل فيها</label>
         <div id="gamesBox"></div>
 
@@ -97,13 +104,25 @@
     </section>
 
     <section class="card">
+      <h2>فرق المسجد</h2>
+      <label for="teamName">اسم الفريق</label>
+      <input id="teamName" maxlength="60" style="width:100%;min-height:48px;padding:10px 14px;font:inherit;font-size:16px;border:1.5px solid #CBD5E1;border-radius:12px">
+      <label for="teamSup">اسم مشرف الفريق</label>
+      <input id="teamSup" maxlength="60" style="width:100%;min-height:48px;padding:10px 14px;font:inherit;font-size:16px;border:1.5px solid #CBD5E1;border-radius:12px">
+      <div class="row"><button id="addTeamBtn" type="button" class="ghost">إضافة فريق</button></div>
+      <p id="teamMsg" class="item-meta"></p>
+      <div id="teamList" style="margin-top:10px"></div>
+    </section>
+
+    <section class="card">
       <h2>الطلاب</h2>
       <div id="list"><p class="empty">جاري التحميل...</p></div>
     </section>
   </main>
 
   <script type="module">
-    import { auth, db } from "./firebase.js";
+    import { auth, db, tf } from "./firebase.js";
+    import { compressLogo } from "./logo.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, setDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -127,7 +146,7 @@
       }
       me = { uid: user.uid, ...p };
 
-      const mSnap = await getDocs(query(collection(db, "mosques"), where("isTest", "==", false)));
+      const mSnap = await getDocs(query(collection(db, "mosques"), ...tf()));
       mosquesMap = Object.fromEntries(mSnap.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
 
       if (me.role === "admin") {
@@ -155,6 +174,7 @@
       Object.entries(props).forEach(([k, v]) => {
         if (k === "class") node.className = v;
         else if (k === "text") node.textContent = v;
+        else if (k === "style") Object.assign(node.style, v);
         else node[k] = v;
       });
       children.forEach((c) => node.appendChild(c));
@@ -168,10 +188,12 @@
       const m = mosquesMap[id] || {};
       mosqueLocked = m.locked === true;
       $("mosqueName").textContent = m.name || id;
+      showLogo();
       $("lockNotice").classList.toggle("hidden", !mosqueLocked);
       $("lockBtn").classList.toggle("hidden", mosqueLocked || me.role !== "mosque_supervisor");
       resetForm();
       await loadGames();
+      await loadTeams();
       await loadStudents();
       await loadUnlockRequest();
     }
@@ -224,6 +246,84 @@
       }
     });
 
+
+    function showLogo() {
+      const m = mosquesMap[mosqueId] || {};
+      const box = $("logoBox");
+      box.innerHTML = "";
+      if (m.logo) box.appendChild(el("img", { src: m.logo, alt: "", style: { width: "64px", height: "64px", borderRadius: "12px", objectFit: "cover" } }));
+      else box.appendChild(el("span", { class: "item-meta", text: "ما في شعار بعد" }));
+    }
+
+    $("logoUp").addEventListener("change", async () => {
+      const f = $("logoUp").files[0];
+      if (!f) return;
+      $("logoMsg").textContent = "";
+      if (mosqueLocked) { $("logoMsg").textContent = "المسجد مقفول"; return; }
+      try {
+        const data = await compressLogo(f);
+        await updateDoc(doc(db, "mosques", mosqueId), { logo: data, logoAt: serverTimestamp() });
+        mosquesMap[mosqueId] = { ...(mosquesMap[mosqueId] || {}), logo: data };
+        showLogo();
+        $("logoMsg").textContent = "تم تحديث الشعار";
+      } catch (e) {
+        $("logoMsg").textContent = (e?.code ? "[" + e.code + "] " : "") + (e?.message || "صار خطأ");
+      }
+    });
+
+
+    let teams = [];
+    async function loadTeams() {
+      if (!mosqueId) return;
+      const snap = await getDocs(query(collection(db, "teams"), where("mosqueId", "==", mosqueId), ...tf()));
+      teams = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      teams.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+      const sel = $("teamSelect");
+      const keep = sel.value;
+      sel.innerHTML = "";
+      sel.appendChild(el("option", { value: "", text: "بدون فريق" }));
+      teams.forEach((t) => sel.appendChild(el("option", { value: t.id, text: t.name || t.id })));
+      sel.value = keep;
+      const box = $("teamList");
+      box.innerHTML = "";
+      if (!teams.length) box.appendChild(el("p", { class: "item-meta", text: "ما في فرق بعد" }));
+      teams.forEach((t) => box.appendChild(el("div", { class: "item" }, [
+        el("div", { class: "item-name", text: t.name || "-" }),
+        el("div", { class: "item-meta", text: "مشرف الفريق: " + (t.supervisorName || "-") }),
+        el("div", { class: "row" }, [
+          el("button", { class: "danger", type: "button", text: "حذف الفريق", disabled: mosqueLocked, onclick: () => removeTeam(t) }),
+        ]),
+      ])));
+    }
+
+    $("addTeamBtn").addEventListener("click", async () => {
+      $("teamMsg").textContent = "";
+      const name = $("teamName").value.trim();
+      const supervisorName = $("teamSup").value.trim();
+      if (mosqueLocked) return ($("teamMsg").textContent = "المسجد مقفول");
+      if (name.length < 2) return ($("teamMsg").textContent = "اسم الفريق لازم يكون حرفين على الأقل");
+      if (supervisorName.length < 2) return ($("teamMsg").textContent = "اكتب اسم مشرف الفريق");
+      try {
+        await addDoc(collection(db, "teams"), { name, supervisorName, mosqueId, isTest: false, createdAt: serverTimestamp(), createdBy: me.uid });
+        $("teamName").value = "";
+        $("teamSup").value = "";
+        await loadTeams();
+      } catch (e) {
+        $("teamMsg").textContent = (e?.code ? "[" + e.code + "] " : "") + (e?.message || "صار خطأ");
+      }
+    });
+
+    async function removeTeam(t) {
+      if (mosqueLocked) return;
+      if (!confirm("حذف الفريق (" + (t.name || "") + ")؟ الطلاب المرتبطين يبقون بدون فريق.")) return;
+      try {
+        await deleteDoc(doc(db, "teams", t.id));
+        await loadTeams();
+      } catch (e) {
+        alert((e?.code ? "[" + e.code + "] " : "") + (e?.message || "صار خطأ"));
+      }
+    }
+
     // ---------- الإعدادات ----------
     async function loadLimit() {
       const snap = await getDoc(doc(db, "settings", "studentLimits"));
@@ -253,7 +353,7 @@
 
     // ---------- الألعاب والسعة ----------
     async function loadGames() {
-      const snap = await getDocs(query(collection(db, "games"), where("isTest", "==", false)));
+      const snap = await getDocs(query(collection(db, "games"), ...tf()));
       games = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((g) => !g.archived);
       games.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
       renderGamesBox();
@@ -303,7 +403,7 @@
       const snap = await getDocs(query(
         collection(db, "players"),
         where("mosqueId", "==", mosqueId),
-        where("isTest", "==", false)
+        ...tf()
       ));
       students = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       students.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
@@ -326,7 +426,7 @@
       students.forEach((s) => {
         list.appendChild(el("div", { class: "item" }, [
           el("div", { class: "item-name", text: s.name || "-" }),
-          el("div", { class: "item-meta", text: (s.games || []).map(gameNameOf).join("، ") || "بدون ألعاب" }),
+          el("div", { class: "item-meta", text: ((teams.find((t) => t.id === s.teamId) || {}).name ? "الفريق: " + teams.find((t) => t.id === s.teamId).name + " · " : "") + ((s.games || []).map(gameNameOf).join("، ") || "بدون ألعاب") }),
           el("div", { class: "row" }, [
             el("button", { class: "ghost", type: "button", text: "تعديل", disabled: mosqueLocked, onclick: () => startEdit(s) }),
             el("button", { class: "danger", type: "button", text: "حذف", disabled: mosqueLocked, onclick: () => removeStudent(s) }),
@@ -387,11 +487,11 @@
       btn.disabled = true;
       try {
         if (editingId) {
-          await updateDoc(doc(db, "players", editingId), { name, games: selected, updatedAt: serverTimestamp() });
+          await updateDoc(doc(db, "players", editingId), { name, games: selected, teamId: $("teamSelect").value || null, updatedAt: serverTimestamp() });
           $("formOk").textContent = "تم حفظ التعديل";
         } else {
           await addDoc(collection(db, "players"), {
-            name, games: selected, mosqueId, isTest: false,
+            name, games: selected, teamId: $("teamSelect").value || null, mosqueId, isTest: false,
             createdAt: serverTimestamp(), createdBy: me.uid,
           });
           $("formOk").textContent = "تم تسجيل الطالب";
