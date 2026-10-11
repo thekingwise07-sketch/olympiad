@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>الترتيب</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; --red:#B91C1C; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; }
+    header { background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px; }
+    header h1 { margin: 0; font-size: 20px; font-weight: 900; }
+    header a { color: #fff; font-weight: 700; text-decoration: none; min-height: 48px; display: inline-flex; align-items: center; }
+    main { max-width: 640px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 4px 16px rgba(30,58,138,.08); margin-bottom: 16px; }
+    h2 { margin: 0 0 12px; font-size: 19px; color: var(--blue); }
+    label { display: block; margin: 12px 0 6px; font-weight: 700; color: var(--blue); }
+    select, input { width: 100%; min-height: 48px; padding: 10px 14px; font: inherit; font-size: 16px; border: 1.5px solid #CBD5E1; border-radius: 12px; background: #fff; }
+    input[type="number"] { direction: ltr; text-align: center; }
+    button { min-height: 48px; padding: 0 16px; margin-top: 12px; font: inherit; font-weight: 700; font-size: 16px; background: var(--blue); color: #fff; border: 0; border-radius: 12px; cursor: pointer; }
+    .hidden { display: none !important; }
+    .msg { min-height: 22px; margin: 10px 0 0; font-size: 15px; }
+    .err { color: var(--red); }
+    .ok { color: #166534; }
+    .pts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .pts-grid div { font-weight: 700; color: var(--blue); font-size: 14px; }
+    .row { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid #E2E8F0; }
+    .rank { width: 30px; font-weight: 900; font-size: 18px; color: var(--blue); text-align: center; flex: 0 0 30px; }
+    .info { flex: 1; min-width: 0; }
+    .name { font-weight: 900; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+    .dot { width: 14px; height: 14px; border-radius: 4px; flex: 0 0 14px; }
+    .bar-wrap { height: 14px; background: #E2E8F0; border-radius: 999px; margin-top: 8px; overflow: hidden; }
+    .bar { height: 100%; border-radius: 999px; width: 0; transition: width .8s ease; }
+    .meta { color: #475569; font-size: 13px; margin-top: 4px; }
+    .pts { font-size: 22px; font-weight: 900; color: var(--gold); direction: ltr; min-width: 46px; text-align: right; }
+    .empty { color: #64748B; text-align: center; padding: 16px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>الترتيب</h1>
+    <a href="app.html">رجوع</a>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>لوحة سباق المساجد</h2>
+      <label for="gameFilter">عرض حسب اللعبة</label>
+      <select id="gameFilter"><option value="">كل الألعاب</option></select>
+      <div id="board" style="margin-top:12px"><p class="empty">جاري التحميل...</p></div>
+    </section>
+
+    <section class="card hidden" id="pointsCard">
+      <h2>نقاط الألعاب (للآدمن)</h2>
+      <div class="pts-grid"><div>اللعبة</div><div>فوز</div><div>تعادل</div></div>
+      <div id="pointsInputs"></div>
+      <button id="savePointsBtn" type="button">حفظ النقاط</button>
+      <p id="pointsMsg" class="msg"></p>
+    </section>
+  </main>
+
+  <script type="module">
+    import { auth, db } from "./firebase.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { collection, doc, getDoc, getDocs, setDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+    const TYPE_LABELS = { football: "كرة القدم", volleyball: "الطائرة", chess: "الشطرنج", sprint: "الضاحية" };
+    const DEFAULT_POINTS = {
+      football: { win: 3, draw: 1, loss: 0 },
+      volleyball: { win: 3, draw: 1, loss: 0 },
+      chess: { win: 3, draw: 1, loss: 0 },
+    };
+
+    let games = {};        // gameId -> game
+    let mosques = {};      // mosqueId -> mosque
+    let finals = [];       // final matches
+    let points = DEFAULT_POINTS;
+    let isAdmin = false;
+
+    function el(tag, props = {}, children = []) {
+      const node = document.createElement(tag);
+      Object.entries(props).forEach(([k, v]) => {
+        if (k === "class") node.className = v;
+        else if (k === "text") node.textContent = v;
+        else if (k === "style") Object.assign(node.style, v);
+        else node[k] = v;
+      });
+      children.forEach((c) => node.appendChild(c));
+      return node;
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        const p = snap.exists() ? snap.data() : null;
+        isAdmin = !!p && p.role === "admin" && !p.disabled && !p.deleted;
+      }
+      $("pointsCard").classList.toggle("hidden", !isAdmin);
+      await loadAll();
+    });
+
+    async function loadAll() {
+      const [gSnap, mSnap, sSnap, mtSnap] = await Promise.all([
+        getDocs(query(collection(db, "games"), where("isTest", "==", false))),
+        getDocs(collection(db, "mosques")),
+        getDoc(doc(db, "settings", "points")),
+        getDocs(query(collection(db, "matches"), where("isTest", "==", false), where("status", "==", "final"))),
+      ]);
+      games = Object.fromEntries(gSnap.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
+      mosques = Object.fromEntries(mSnap.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
+      points = sSnap.exists() ? { ...DEFAULT_POINTS, ...sSnap.data() } : DEFAULT_POINTS;
+      finals = mtSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      const sel = $("gameFilter");
+      const current = sel.value;
+      sel.innerHTML = "";
+      sel.appendChild(el("option", { value: "", text: "كل الألعاب" }));
+      Object.values(games).filter((g) => !g.archived).forEach((g) => sel.appendChild(el("option", { value: g.id, text: g.name || g.id })));
+      sel.value = current;
+
+      renderBoard();
+      if (isAdmin) renderPointsForm();
+    }
+
+    $("gameFilter").addEventListener("change", renderBoard);
+
+    // ---------- حساب الترتيب من المباريات النهائية فقط ----------
+    function computeStandings(gameFilter) {
+      const table = {};
+      const ensure = (id) => (table[id] ||= { id, pts: 0, win: 0, draw: 0, loss: 0 });
+
+      finals.forEach((m) => {
+        if (gameFilter && m.gameId !== gameFilter) return;
+        const game = games[m.gameId];
+        if (!game) return;
+        const cfg = points[game.type] || DEFAULT_POINTS[game.type] || { win: 0, draw: 0, loss: 0 };
+        const a = ensure(m.mosqueA);
+        const b = ensure(m.mosqueB);
+        if (m.scoreA > m.scoreB) {
+          a.pts += cfg.win; a.win++; b.pts += cfg.loss; b.loss++;
+        } else if (m.scoreA < m.scoreB) {
+          b.pts += cfg.win; b.win++; a.pts += cfg.loss; a.loss++;
+        } else {
+          a.pts += cfg.draw; a.draw++; b.pts += cfg.draw; b.draw++;
+        }
+      });
+
+      return Object.values(table).sort((x, y) => y.pts - x.pts || y.win - x.win);
+    }
+
+    function renderBoard() {
+      const board = $("board");
+      board.innerHTML = "";
+      const gameFilter = $("gameFilter").value;
+      const rows = computeStandings(gameFilter);
+      if (!rows.length) {
+        board.appendChild(el("p", { class: "empty", text: "ما في مباريات نهائية بعد" }));
+        return;
+      }
+      const max = Math.max(1, ...rows.map((r) => r.pts));
+      rows.forEach((r, i) => {
+        const m = mosques[r.id] || {};
+        const color = m.color || "#1E3A8A";
+        const bar = el("div", { class: "bar", style: { background: color, width: "0%" } });
+        board.appendChild(el("div", { class: "row" }, [
+          el("div", { class: "rank", text: String(i + 1) }),
+          el("div", { class: "info" }, [
+            el("div", { class: "name" }, [
+              el("span", { class: "dot", style: { background: color } }),
+              el("span", { text: m.name || r.id }),
+            ]),
+            el("div", { class: "bar-wrap" }, [bar]),
+            el("div", { class: "meta", text: "فوز " + r.win + " · تعادل " + r.draw + " · خسارة " + r.loss }),
+          ]),
+          el("div", { class: "pts", text: String(r.pts) }),
+        ]));
+        requestAnimationFrame(() => setTimeout(() => { bar.style.width = (r.pts / max * 100) + "%"; }, 50));
+      });
+    }
+
+    // ---------- نقاط الألعاب (للآدمن) ----------
+    function renderPointsForm() {
+      const box = $("pointsInputs");
+      box.innerHTML = "";
+      ["football", "volleyball", "chess"].forEach((type) => {
+        const cfg = points[type] || DEFAULT_POINTS[type];
+        box.appendChild(el("div", { class: "pts-grid", style: { marginTop: "8px" } }, [
+          el("div", { text: TYPE_LABELS[type] }),
+          el("input", { type: "number", min: "0", max: "99", value: cfg.win, id: type + "Win", dir: "ltr" }),
+          el("input", { type: "number", min: "0", max: "99", value: cfg.draw, id: type + "Draw", dir: "ltr" }),
+        ]));
+      });
+    }
+
+    $("savePointsBtn").addEventListener("click", async () => {
+      $("pointsMsg").className = "msg";
+      const out = {};
+      for (const type of ["football", "volleyball", "chess"]) {
+        const win = Number($(type + "Win").value);
+        const draw = Number($(type + "Draw").value);
+        if (![win, draw].every((v) => Number.isInteger(v) && v >= 0 && v <= 99)) {
+          $("pointsMsg").classList.add("err");
+          $("pointsMsg").textContent = "النقاط لازم تكون أرقام بين 0 و99";
+          return;
+        }
+        out[type] = { win, draw, loss: 0 };
+      }
+      try {
+        await setDoc(doc(db, "settings", "points"), { ...out, updatedAt: serverTimestamp() }, { merge: true });
+        points = { ...DEFAULT_POINTS, ...out };
+        $("pointsMsg").classList.add("ok");
+        $("pointsMsg").textContent = "تم حفظ النقاط";
+        renderBoard();
+      } catch (e) {
+        $("pointsMsg").classList.add("err");
+        $("pointsMsg").textContent = (e?.code ? "[" + e.code + "] " : "") + (e?.message || "صار خطأ");
+      }
+    });
+  </script>
+</body>
+</html>

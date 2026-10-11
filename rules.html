@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>القوانين</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; --red:#B91C1C; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; }
+    header { background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px; }
+    header h1 { margin: 0; font-size: 20px; font-weight: 900; }
+    header a { color: #fff; font-weight: 700; text-decoration: none; min-height: 48px; display: inline-flex; align-items: center; }
+    main { max-width: 640px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 4px 16px rgba(30,58,138,.08); margin-bottom: 16px; }
+    h2 { margin: 0 0 12px; font-size: 19px; color: var(--blue); }
+    label { display: block; margin: 12px 0 6px; font-weight: 700; color: var(--blue); }
+    textarea { width: 100%; min-height: 160px; padding: 12px 14px; font: inherit; font-size: 16px; border: 1.5px solid #CBD5E1; border-radius: 12px; background: #fff; resize: vertical; line-height: 1.9; }
+    textarea:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,169,55,.25); }
+    button { min-height: 48px; padding: 0 16px; margin-top: 12px; font: inherit; font-weight: 700; font-size: 16px; background: var(--blue); color: #fff; border: 0; border-radius: 12px; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: default; }
+    .hidden { display: none !important; }
+    .msg { min-height: 22px; margin: 10px 0 0; font-size: 15px; }
+    .err { color: var(--red); }
+    .ok { color: #166534; }
+    .body { white-space: pre-wrap; line-height: 1.9; font-size: 16px; }
+    .sec-title { font-weight: 900; font-size: 18px; color: var(--blue); margin-bottom: 8px; }
+    .sep { border: 0; border-top: 1px solid #E2E8F0; margin: 16px 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>القوانين</h1>
+    <a href="app.html">رجوع</a>
+  </header>
+
+  <main>
+    <section class="card" id="viewCard">
+      <div id="view"><p class="body">جاري التحميل...</p></div>
+    </section>
+
+    <section class="card hidden" id="adminCard">
+      <h2>تعديل القوانين (للآدمن)</h2>
+      <label for="sectionSelect">اختر القسم</label>
+      <select id="sectionSelect" style="width:100%;min-height:48px;padding:10px 14px;font:inherit;font-size:16px;border:1.5px solid #CBD5E1;border-radius:12px"></select>
+      <label for="ruleBody">النص</label>
+      <textarea id="ruleBody"></textarea>
+      <button id="saveRuleBtn" type="button">حفظ القسم</button>
+      <p id="ruleMsg" class="msg"></p>
+    </section>
+  </main>
+
+  <script type="module">
+    import { auth, db } from "./firebase.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { collection, doc, getDoc, getDocs, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+
+    // أقسام القوانين (معرّف الوثيقة + العنوان)
+    const SECTIONS = [
+      { id: "general", title: "القوانين العامة ومبادئ اللعب والأخلاق" },
+      { id: "football", title: "قوانين كرة القدم" },
+      { id: "volleyball", title: "قوانين الطائرة" },
+      { id: "chess", title: "قوانين الشطرنج" },
+      { id: "sprint", title: "قوانين الضاحية" },
+    ];
+
+    let isAdmin = false;
+    let texts = {};
+
+    onAuthStateChanged(auth, async (user) => {
+      isAdmin = false;
+      if (user) {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        const p = snap.exists() ? snap.data() : null;
+        isAdmin = !!p && p.role === "admin" && !p.disabled && !p.deleted;
+      }
+      $("adminCard").classList.toggle("hidden", !isAdmin);
+      await loadRules();
+    });
+
+    async function loadRules() {
+      const snap = await getDocs(collection(db, "rules"));
+      texts = Object.fromEntries(snap.docs.map((d) => [d.id, d.data().body || ""]));
+      renderView();
+      renderAdmin();
+    }
+
+    function renderView() {
+      const view = $("view");
+      view.innerHTML = "";
+      SECTIONS.forEach((s, i) => {
+        const body = texts[s.id];
+        const block = document.createElement("div");
+        const title = document.createElement("div");
+        title.className = "sec-title";
+        title.textContent = s.title;
+        const text = document.createElement("div");
+        text.className = "body";
+        text.textContent = body || "لم تُكتب بعد.";
+        block.appendChild(title);
+        block.appendChild(text);
+        view.appendChild(block);
+        if (i < SECTIONS.length - 1) {
+          const hr = document.createElement("hr");
+          hr.className = "sep";
+          view.appendChild(hr);
+        }
+      });
+    }
+
+    function renderAdmin() {
+      const sel = $("sectionSelect");
+      const keep = sel.value;
+      sel.innerHTML = "";
+      SECTIONS.forEach((s) => {
+        const o = document.createElement("option");
+        o.value = s.id;
+        o.textContent = s.title;
+        sel.appendChild(o);
+      });
+      if (keep) sel.value = keep;
+      $("ruleBody").value = texts[sel.value] || "";
+    }
+
+    $("sectionSelect").addEventListener("change", () => {
+      $("ruleBody").value = texts[$("sectionSelect").value] || "";
+      $("ruleMsg").textContent = "";
+    });
+
+    $("saveRuleBtn").addEventListener("click", async () => {
+      const id = $("sectionSelect").value;
+      const body = $("ruleBody").value.trim();
+      $("ruleMsg").className = "msg";
+      if (body.length < 2) {
+        $("ruleMsg").classList.add("err");
+        $("ruleMsg").textContent = "اكتب نص القانون";
+        return;
+      }
+      $("saveRuleBtn").disabled = true;
+      try {
+        await setDoc(doc(db, "rules", id), { body, updatedAt: serverTimestamp() }, { merge: true });
+        texts[id] = body;
+        renderView();
+        $("ruleMsg").classList.add("ok");
+        $("ruleMsg").textContent = "تم حفظ القسم";
+      } catch (e) {
+        $("ruleMsg").classList.add("err");
+        $("ruleMsg").textContent = (e?.code ? "[" + e.code + "] " : "") + (e?.message || "صار خطأ");
+      } finally {
+        $("saveRuleBtn").disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

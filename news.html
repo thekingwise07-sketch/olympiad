@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>الأخبار</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; --red:#B91C1C; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; }
+    header { background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px; }
+    header h1 { margin: 0; font-size: 20px; font-weight: 900; }
+    header a { color: #fff; font-weight: 700; text-decoration: none; min-height: 48px; display: inline-flex; align-items: center; }
+    main { max-width: 640px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 4px 16px rgba(30,58,138,.08); margin-bottom: 16px; }
+    h2 { margin: 0 0 12px; font-size: 19px; color: var(--blue); }
+    label { display: block; margin: 12px 0 6px; font-weight: 700; color: var(--blue); }
+    input, textarea { width: 100%; padding: 10px 14px; font: inherit; font-size: 16px; border: 1.5px solid #CBD5E1; border-radius: 12px; background: #fff; }
+    input { min-height: 48px; }
+    textarea { min-height: 120px; resize: vertical; line-height: 1.8; }
+    input:focus, textarea:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,169,55,.25); }
+    button { min-height: 48px; padding: 0 16px; margin-top: 12px; font: inherit; font-weight: 700; font-size: 16px; background: var(--blue); color: #fff; border: 0; border-radius: 12px; cursor: pointer; }
+    button.ghost { background: #fff; color: var(--blue); border: 1.5px solid var(--blue); }
+    button.danger { background: var(--red); }
+    button:disabled { opacity: .5; cursor: default; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .row button { margin-top: 0; flex: 1 1 auto; font-size: 15px; }
+    .err { color: var(--red); min-height: 22px; margin: 10px 0 0; font-size: 15px; }
+    .hidden { display: none !important; }
+    .news { border: 1.5px solid #E2E8F0; border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+    .news-title { font-weight: 900; font-size: 18px; color: var(--blue); }
+    .news-date { color: #64748B; font-size: 13px; margin: 4px 0 10px; }
+    .news-body { white-space: pre-wrap; line-height: 1.9; font-size: 16px; }
+    .empty { color: #64748B; text-align: center; padding: 16px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>الأخبار</h1>
+    <a href="app.html">رجوع</a>
+  </header>
+
+  <main>
+    <section class="card hidden" id="formCard">
+      <h2 id="formTitle">خبر جديد</h2>
+      <form id="newsForm" autocomplete="off" onsubmit="return false;">
+        <label for="title">العنوان</label>
+        <input id="title" maxlength="120">
+        <label for="body">نص الخبر</label>
+        <textarea id="body" maxlength="5000"></textarea>
+        <div class="row">
+          <button id="saveBtn" type="button">نشر</button>
+          <button id="cancelBtn" type="button" class="ghost hidden">إلغاء التعديل</button>
+        </div>
+        <p id="formErr" class="err" role="alert"></p>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>آخر الأخبار</h2>
+      <div id="list"><p class="empty">جاري التحميل...</p></div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { auth, db } from "./firebase.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+    let me = null;
+    let editingId = null;
+
+    onAuthStateChanged(auth, async (user) => {
+      me = null;
+      if (user) {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        const p = snap.exists() ? snap.data() : null;
+        if (p && !p.disabled && !p.deleted && !p.mustChange && ["admin", "supervisor"].includes(p.role)) {
+          me = { uid: user.uid, ...p };
+        }
+      }
+      $("formCard").classList.toggle("hidden", !me);
+      await loadNews();
+    });
+
+    function el(tag, props = {}, children = []) {
+      const node = document.createElement(tag);
+      Object.entries(props).forEach(([k, v]) => {
+        if (k === "class") node.className = v;
+        else if (k === "text") node.textContent = v;
+        else node[k] = v;
+      });
+      children.forEach((c) => node.appendChild(c));
+      return node;
+    }
+
+    const errText = (e) => (e?.code ? "[" + e.code + "] " : "") + (e?.message || "صار خطأ، حاول مرة ثانية");
+
+    function fmtDate(ts) {
+      if (!ts || !ts.toDate) return "";
+      return ts.toDate().toLocaleString("ar", { dateStyle: "medium", timeStyle: "short" });
+    }
+
+    async function loadNews() {
+      const snap = await getDocs(query(collection(db, "news"), where("isTest", "==", false)));
+      const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      const list = $("list");
+      list.innerHTML = "";
+      if (!items.length) {
+        list.appendChild(el("p", { class: "empty", text: "ما في أخبار بعد" }));
+        return;
+      }
+      items.forEach((n) => {
+        const kids = [
+          el("div", { class: "news-title", text: n.title || "-" }),
+          el("div", { class: "news-date", text: fmtDate(n.createdAt) + (n.authorName ? " · " + n.authorName : "") }),
+          el("div", { class: "news-body", text: n.body || "" }),
+        ];
+        if (me) {
+          kids.push(el("div", { class: "row" }, [
+            el("button", { class: "ghost", type: "button", text: "تعديل", onclick: () => startEdit(n) }),
+            el("button", { class: "danger", type: "button", text: "حذف", onclick: () => removeNews(n) }),
+          ]));
+        }
+        list.appendChild(el("div", { class: "news" }, kids));
+      });
+    }
+
+    function resetForm() {
+      editingId = null;
+      $("title").value = "";
+      $("body").value = "";
+      $("formTitle").textContent = "خبر جديد";
+      $("saveBtn").textContent = "نشر";
+      $("cancelBtn").classList.add("hidden");
+      $("formErr").textContent = "";
+    }
+    $("cancelBtn").addEventListener("click", resetForm);
+
+    function startEdit(n) {
+      editingId = n.id;
+      $("title").value = n.title || "";
+      $("body").value = n.body || "";
+      $("formTitle").textContent = "تعديل الخبر";
+      $("saveBtn").textContent = "حفظ التعديل";
+      $("cancelBtn").classList.remove("hidden");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    $("saveBtn").addEventListener("click", async () => {
+      $("formErr").textContent = "";
+      const title = $("title").value.trim();
+      const body = $("body").value.trim();
+      if (title.length < 2) return ($("formErr").textContent = "العنوان لازم يكون حرفين على الأقل");
+      if (body.length < 2) return ($("formErr").textContent = "اكتب نص الخبر");
+      const btn = $("saveBtn");
+      btn.disabled = true;
+      try {
+        if (editingId) {
+          await updateDoc(doc(db, "news", editingId), { title, body, updatedAt: serverTimestamp() });
+        } else {
+          await addDoc(collection(db, "news"), {
+            title, body, isTest: false,
+            createdAt: serverTimestamp(), createdBy: me.uid,
+            authorName: me.name || "",
+          });
+        }
+        resetForm();
+        await loadNews();
+      } catch (e) {
+        $("formErr").textContent = errText(e);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    async function removeNews(n) {
+      if (!confirm("حذف هذا الخبر؟")) return;
+      try {
+        await deleteDoc(doc(db, "news", n.id));
+        await loadNews();
+      } catch (e) {
+        alert(errText(e));
+      }
+    }
+  </script>
+</body>
+</html>
