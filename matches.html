@@ -181,6 +181,7 @@
           el("div", { class: "teams", text: mosqueName(m.mosqueA) + " ضد " + mosqueName(m.mosqueB) }),
           el("div", { class: "meta", text: gameName(m.gameId) }),
           el("div", { class: "row" }, [
+            ...(["football", "volleyball"].includes(((games.find((g) => g.id === m.gameId)) || {}).type) ? [el("button", { class: "ghost", type: "button", text: "تفاصيل المباراة", onclick: () => { location.href = "match.html?id=" + m.id; } })] : []),
             ...(canEdit ? [el("button", { class: "ghost", type: "button", text: final ? "تصحيح" : "تعديل", onclick: () => startEdit(m) })] : []),
             ...(canDelete ? [el("button", { class: "danger", type: "button", text: "حذف", onclick: () => removeMatch(m) })] : []),
           ]),

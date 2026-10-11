@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>تفاصيل المباراة</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; --red:#B91C1C; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; }
+    header { background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px; }
+    header h1 { margin: 0; font-size: 18px; font-weight: 900; }
+    header a { color: #fff; font-weight: 700; text-decoration: none; min-height: 48px; display: inline-flex; align-items: center; }
+    main { max-width: 640px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 4px 16px rgba(30,58,138,.08); margin-bottom: 16px; }
+    h2 { margin: 0 0 10px; font-size: 17px; color: var(--blue); }
+    .head { text-align: center; }
+    .head .teams { font-weight: 900; font-size: 17px; }
+    .head .score { font-size: 34px; font-weight: 900; color: var(--gold); direction: ltr; }
+    .notice { background: #FEF3C7; color: #92400E; border-radius: 12px; padding: 10px; font-weight: 700; margin-bottom: 12px; }
+    .player { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid #E2E8F0; padding: 8px 0; flex-wrap: wrap; }
+    .player .pname { flex: 1 1 100%; font-weight: 700; }
+    .ctr { display: flex; align-items: center; gap: 4px; font-size: 13px; color: #475569; }
+    .ctr b { min-width: 22px; text-align: center; font-size: 16px; color: var(--blue); }
+    .ctr button { min-height: 40px; min-width: 40px; margin: 0; padding: 0; font-size: 18px; border-radius: 10px; }
+    .ctr button.minus { background: #fff; color: var(--blue); border: 1.5px solid var(--blue); }
+    .teamBox { flex: 1; min-width: 0; }
+    .teams2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 420px) { .teams2 { grid-template-columns: 1fr; } }
+    button { min-height: 48px; padding: 0 14px; margin-top: 10px; font: inherit; font-weight: 700; font-size: 16px; background: var(--blue); color: #fff; border: 0; border-radius: 12px; cursor: pointer; }
+    button.ghost { background: #fff; color: var(--blue); border: 1.5px solid var(--blue); }
+    button.danger { background: var(--red); }
+    button:disabled { opacity: .5; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .row > * { flex: 1 1 auto; }
+    .set { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; margin-bottom: 8px; }
+    input[type="number"] { width: 100%; min-height: 48px; padding: 8px; font: inherit; font-size: 18px; text-align: center; border: 1.5px solid #CBD5E1; border-radius: 12px; direction: ltr; }
+    .msg { min-height: 22px; font-size: 15px; margin: 8px 0 0; }
+    .err { color: var(--red); }
+    .ok { color: #166534; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 id="title">تفاصيل المباراة</h1>
+    <a href="matches.html">رجوع</a>
+  </header>
+
+  <main>
+    <section class="card hidden" id="bad"><p class="notice" id="badMsg"></p></section>
+
+    <div id="content" class="hidden">
+      <section class="card head">
+        <div class="teams" id="teams"></div>
+        <div class="score" id="scoreBig">0 - 0</div>
+        <div class="meta" id="statusTxt"></div>
+      </section>
+
+      <section class="card hidden" id="footballCard">
+        <h2>كرة القدم: اللاعبين والأحداث</h2>
+        <p class="notice hidden" id="finalNotice">المباراة نهائية. التعديل للآدمن فقط.</p>
+        <div class="teams2">
+          <div class="teamBox"><h2 id="nameA"></h2><div id="listA"></div></div>
+          <div class="teamBox"><h2 id="nameB"></h2><div id="listB"></div></div>
+        </div>
+        <div class="row">
+          <button id="undoBtn" type="button" class="ghost">تراجع</button>
+        </div>
+      </section>
+
+      <section class="card hidden" id="volleyCard">
+        <h2>الطائرة: الأشواط الثلاثة</h2>
+        <div id="sets"></div>
+      </section>
+
+      <section class="card" id="saveCard">
+        <div class="row">
+          <button id="draftBtn" type="button" class="ghost">حفظ كمسودة</button>
+          <button id="finalBtn" type="button">اعتماد نهائي</button>
+        </div>
+        <p id="saveMsg" class="msg"></p>
+      </section>
+    </div>
+  </main>
+
+  <script type="module">
+    import { auth, db } from "./firebase.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { collection, doc, getDoc, getDocs, updateDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+    const params = new URLSearchParams(location.search);
+    const matchId = params.get("id");
+    let me = null, match = null, game = null, mosquesMap = {};
+    let players = { A: [], B: [] };
+    let counters = {};   // playerId -> {goals, yellow, red, fouls}
+    let history = [];    // للتراجع: {pid, field, delta}
+    let sets = [{ a: 0, b: 0 }, { a: 0, b: 0 }, { a: 0, b: 0 }];
+
+    function bad(msg) {
+      $("bad").classList.remove("hidden");
+      $("badMsg").textContent = msg;
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return location.replace("index.html");
+      if (!matchId) return bad("المباراة غير محددة");
+      const uSnap = await getDoc(doc(db, "users", user.uid));
+      const p = uSnap.exists() ? uSnap.data() : null;
+      if (!p || p.disabled || p.deleted || !["admin", "organizer"].includes(p.role)) return bad("ما عندك صلاحية لهذي الصفحة");
+      me = { uid: user.uid, ...p };
+
+      const mSnap = await getDoc(doc(db, "matches", matchId));
+      if (!mSnap.exists()) return bad("المباراة غير موجودة");
+      match = { id: matchId, ...mSnap.data() };
+
+      if (me.role === "organizer" && match.gameId !== me.gameId) return bad("هذي المباراة مو من لعبتك");
+      if (match.status === "final" && me.role !== "admin") return bad("المباراة نهائية، التعديل للآدمن فقط");
+
+      const gSnap = await getDoc(doc(db, "games", match.gameId));
+      game = gSnap.exists() ? { id: gSnap.id, ...gSnap.data() } : {};
+      if (!["football", "volleyball"].includes(game.type)) return bad("تفاصيل هذي اللعبة تنضاف لاحقاً. النتيجة تُدخل من صفحة المباريات");
+
+      const ms = await getDocs(query(collection(db, "mosques"), where("isTest", "==", false)));
+      mosquesMap = Object.fromEntries(ms.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
+
+      $("content").classList.remove("hidden");
+      $("title").textContent = "تفاصيل: " + (game.name || "");
+      const nameA = (mosquesMap[match.mosqueA] || {}).name || match.mosqueA;
+      const nameB = (mosquesMap[match.mosqueB] || {}).name || match.mosqueB;
+      $("teams").textContent = nameA + " ضد " + nameB;
+      $("statusTxt").textContent = match.status === "final" ? "نهائية" : "مسودة";
+      $("nameA").textContent = nameA;
+      $("nameB").textContent = nameB;
+
+      if (game.type === "football") {
+        $("footballCard").classList.remove("hidden");
+        await loadPlayers();
+        loadCounters();
+        renderFootball();
+      } else {
+        $("volleyCard").classList.remove("hidden");
+        if (match.details?.sets) sets = match.details.sets.map((s) => ({ a: s.a, b: s.b }));
+        renderSets();
+      }
+      if (match.status === "final") { $("finalNotice").classList.remove("hidden"); $("finalBtn").textContent = "حفظ التعديل"; }
+      updateScore();
+    });
+
+    // ---------- لاعبين المسجد اللي مسجلين باللعبة ----------
+    async function loadPlayers() {
+      const load = async (mid) => {
+        const snap = await getDocs(query(collection(db, "players"), where("mosqueId", "==", mid), where("isTest", "==", false)));
+        return snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((s) => (s.games || []).includes(match.gameId));
+      };
+      players.A = await load(match.mosqueA);
+      players.B = await load(match.mosqueB);
+    }
+
+    function loadCounters() {
+      const saved = match.details?.players || {};
+      [...players.A, ...players.B].forEach((p) => {
+        counters[p.id] = { goals: 0, yellow: 0, red: 0, fouls: 0, ...(saved[p.id] || {}) };
+      });
+    }
+
+    function ctrRow(p, team) {
+      const c = counters[p.id];
+      const row = document.createElement("div");
+      row.className = "player";
+      row.innerHTML = '<div class="pname"></div>';
+      row.querySelector(".pname").textContent = p.name || "-";
+      [["goals", "هدف"], ["yellow", "صفراء"], ["red", "حمراء"], ["fouls", "فاول"]].forEach(([f, label]) => {
+        const box = document.createElement("div");
+        box.className = "ctr";
+        const minus = document.createElement("button");
+        minus.className = "minus"; minus.type = "button"; minus.textContent = "−";
+        const val = document.createElement("b"); val.textContent = c[f];
+        const plus = document.createElement("button");
+        plus.type = "button"; plus.textContent = "+";
+        const lab = document.createElement("span"); lab.textContent = label;
+        minus.onclick = () => change(p.id, f, -1, val);
+        plus.onclick = () => change(p.id, f, 1, val);
+        box.append(lab, minus, val, plus);
+        row.appendChild(box);
+      });
+      return row;
+    }
+
+    function renderFootball() {
+      const fill = (box, list) => {
+        box.innerHTML = "";
+        if (!list.length) { box.innerHTML = '<p class="meta">ما في لاعبين مسجلين باللعبة</p>'; return; }
+        list.forEach((p) => box.appendChild(ctrRow(p, "")));
+      };
+      fill($("listA"), players.A);
+      fill($("listB"), players.B);
+    }
+
+    function change(pid, field, delta, valEl) {
+      const next = counters[pid][field] + delta;
+      if (next < 0) return;
+      counters[pid][field] = next;
+      valEl.textContent = next;
+      history.push({ pid, field, delta });
+      updateScore();
+    }
+
+    $("undoBtn").addEventListener("click", () => {
+      const last = history.pop();
+      if (!last) return;
+      counters[last.pid][last.field] -= last.delta;
+      renderFootball();
+      updateScore();
+    });
+
+    function goalsOf(list) {
+      return list.reduce((sum, p) => sum + (counters[p.id]?.goals || 0), 0);
+    }
+
+    // ---------- الطائرة ----------
+    function renderSets() {
+      const box = $("sets");
+      box.innerHTML = "";
+      sets.forEach((s, i) => {
+        const row = document.createElement("div");
+        row.className = "set";
+        const a = document.createElement("input"); a.type = "number"; a.min = "0"; a.max = "99"; a.value = s.a;
+        const b = document.createElement("input"); b.type = "number"; b.min = "0"; b.max = "99"; b.value = s.b;
+        a.oninput = () => { sets[i].a = Number(a.value) || 0; updateScore(); };
+        b.oninput = () => { sets[i].b = Number(b.value) || 0; updateScore(); };
+        const lab = document.createElement("span"); lab.textContent = "شوط " + (i + 1);
+        row.append(a, lab, b);
+        box.appendChild(row);
+      });
+    }
+
+    // ---------- النتيجة ----------
+    function computeScore() {
+      if (game.type === "football") return { a: goalsOf(players.A), b: goalsOf(players.B) };
+      let a = 0, b = 0;
+      sets.forEach((s) => { if (s.a > s.b) a++; else if (s.b > s.a) b++; });
+      return { a, b };
+    }
+
+    function updateScore() {
+      const s = computeScore();
+      $("scoreBig").textContent = s.a + " - " + s.b;
+    }
+
+    // ---------- الحفظ ----------
+    async function save(status) {
+      const msg = $("saveMsg");
+      msg.className = "msg";
+      const s = computeScore();
+      if (status === "final" && !confirm("اعتماد النتيجة نهائياً؟")) return;
+      const details = game.type === "football"
+        ? { players: counters }
+        : { sets: sets.map((x) => ({ a: x.a, b: x.b })) };
+      $("draftBtn").disabled = true; $("finalBtn").disabled = true;
+      try {
+        await updateDoc(doc(db, "matches", matchId), {
+          scoreA: s.a, scoreB: s.b, details, status, updatedAt: serverTimestamp(),
+        });
+        msg.classList.add("ok");
+        msg.textContent = status === "final" ? "تم اعتماد النتيجة" : "تم حفظ المسودة";
+        match.status = status;
+        $("statusTxt").textContent = status === "final" ? "نهائية" : "مسودة";
+      } catch (e) {
+        msg.classList.add("err");
+        msg.textContent = (e?.code ? "[" + e.code + "] " : "") + (e?.message || "صار خطأ");
+      } finally {
+        $("draftBtn").disabled = false; $("finalBtn").disabled = false;
+      }
+    }
+
+    $("draftBtn").addEventListener("click", () => save("draft"));
+    $("finalBtn").addEventListener("click", () => save("final"));
+  </script>
+</body>
+</html>

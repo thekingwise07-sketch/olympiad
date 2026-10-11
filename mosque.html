@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>صفحة المسجد</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; }
+    header { background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px; }
+    header h1 { margin: 0; font-size: 18px; font-weight: 900; }
+    header a { color: #fff; font-weight: 700; text-decoration: none; min-height: 48px; display: inline-flex; align-items: center; }
+    main { max-width: 640px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border-radius: 14px; padding: 18px; box-shadow: 0 4px 16px rgba(30,58,138,.08); margin-bottom: 16px; }
+    .top { display: flex; align-items: center; gap: 14px; }
+    .logo { width: 72px; height: 72px; border-radius: 16px; object-fit: cover; flex: 0 0 72px; }
+    .logo-ph { width: 72px; height: 72px; border-radius: 16px; flex: 0 0 72px; }
+    .mname { font-size: 22px; font-weight: 900; color: var(--blue); }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; text-align: center; }
+    .stat b { display: block; font-size: 22px; color: var(--gold); direction: ltr; }
+    .stat span { font-size: 13px; color: #475569; }
+    h2 { margin: 0 0 10px; font-size: 17px; color: var(--blue); }
+    .game { border-bottom: 1px solid #E2E8F0; padding: 10px 0; }
+    .game:last-child { border-bottom: 0; }
+    .gname { font-weight: 900; }
+    .gmeta { color: #475569; font-size: 14px; margin-top: 2px; }
+    .plist { margin: 6px 0 0; padding: 0; list-style: none; font-size: 15px; }
+    .plist li { padding: 3px 0; }
+    .empty { color: #64748B; text-align: center; padding: 10px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>صفحة المسجد</h1>
+    <a href="ranking.html">الترتيب</a>
+  </header>
+
+  <main>
+    <section class="card" id="top"><p class="empty">جاري التحميل...</p></section>
+    <section class="card"><h2>الألعاب والطلاب</h2><div id="games"><p class="empty">جاري التحميل...</p></div></section>
+  </main>
+
+  <script type="module">
+    import { db } from "./firebase.js";
+    import { doc, getDoc, getDocs, collection, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+    const DEFAULT_POINTS = { win: 3, draw: 1, loss: 0 };
+
+    function el(tag, props = {}, children = []) {
+      const node = document.createElement(tag);
+      Object.entries(props).forEach(([k, v]) => {
+        if (k === "class") node.className = v;
+        else if (k === "text") node.textContent = v;
+        else if (k === "style") Object.assign(node.style, v);
+        else if (k === "src" || k === "alt") node[k] = v;
+        else node[k] = v;
+      });
+      children.forEach((c) => node.appendChild(c));
+      return node;
+    }
+
+    async function load() {
+      const id = new URLSearchParams(location.search).get("id");
+      if (!id) return $("top").innerHTML = "<p class='empty'>المسجد غير محدد</p>";
+
+      const mSnap = await getDoc(doc(db, "mosques", id));
+      if (!mSnap.exists() || mSnap.data().isTest) {
+        return $("top").innerHTML = "<p class='empty'>المسجد غير موجود</p>";
+      }
+      const m = mSnap.data();
+
+      const [gSnap, pSnap, mtSnap, sSnap, msSnap] = await Promise.all([
+        getDocs(query(collection(db, "games"), where("isTest", "==", false))),
+        getDocs(query(collection(db, "players"), where("mosqueId", "==", id), where("isTest", "==", false))),
+        getDocs(query(collection(db, "matches"), where("isTest", "==", false), where("status", "==", "final"))),
+        getDoc(doc(db, "settings", "points")),
+        getDocs(query(collection(db, "mosques"), where("isTest", "==", false))),
+      ]);
+      const games = Object.fromEntries(gSnap.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
+      const mosques = Object.fromEntries(msSnap.docs.map((d) => [d.id, d.data()]));
+      const players = pSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const playerIds = new Set(players.map((p) => p.id));
+      const points = sSnap.exists() ? { ...sSnap.data() } : {};
+
+      // إحصائيات: فوز/تعادل/خسارة + نقاط + أهداف (كرة القدم)
+      let win = 0, draw = 0, loss = 0, pts = 0, goals = 0;
+      mtSnap.docs.map((d) => d.data()).forEach((mt) => {
+        const game = games[mt.gameId];
+        if (!game) return;
+        const mine = mt.mosqueA === id ? "A" : mt.mosqueB === id ? "B" : null;
+        if (!mine) return;
+        const cfg = points[game.type] || DEFAULT_POINTS;
+        const myScore = mine === "A" ? mt.scoreA : mt.scoreB;
+        const theirScore = mine === "A" ? mt.scoreB : mt.scoreA;
+        if (myScore > theirScore) { win++; pts += cfg.win ?? 3; }
+        else if (myScore < theirScore) { loss++; pts += cfg.loss ?? 0; }
+        else { draw++; pts += cfg.draw ?? 1; }
+        if (game.type === "football" && mt.details?.players) {
+          Object.entries(mt.details.players).forEach(([pid, c]) => {
+            if (playerIds.has(pid)) goals += Number(c.goals || 0);
+          });
+        }
+      });
+
+      document.title = m.name || "صفحة المسجد";
+      $("top").innerHTML = "";
+      const top = el("div", { class: "top" }, [
+        m.logo ? el("img", { class: "logo", src: m.logo, alt: "" }) : el("div", { class: "logo-ph", style: { background: m.color || "#1E3A8A" } }),
+        el("div", { class: "mname", text: m.name || "-" }),
+      ]);
+      const stats = el("div", { class: "stats" }, [
+        el("div", { class: "stat" }, [el("b", { text: String(pts) }), el("span", { text: "نقاط" })]),
+        el("div", { class: "stat" }, [el("b", { text: win + "-" + draw + "-" + loss }), el("span", { text: "فوز-تعادل-خسارة" })]),
+        el("div", { class: "stat" }, [el("b", { text: String(players.length) }), el("span", { text: "طلاب" })]),
+        el("div", { class: "stat" }, [el("b", { text: String(goals) }), el("span", { text: "أهداف" })]),
+      ]);
+      $("top").appendChild(top);
+      $("top").appendChild(stats);
+
+      // الألعاب والطلاب المسجلين في كل لعبة
+      const gBox = $("games");
+      gBox.innerHTML = "";
+      const perGame = Object.values(games).filter((g) => !g.archived);
+      if (!perGame.length) gBox.appendChild(el("p", { class: "empty", text: "ما في ألعاب بعد" }));
+      perGame.forEach((g) => {
+        const list = players.filter((p) => (p.games || []).includes(g.id));
+        const names = list.map((p) => el("li", { text: p.name || "-" }));
+        gBox.appendChild(el("div", { class: "game" }, [
+          el("div", { class: "gname", text: g.name || "-" }),
+          el("div", { class: "gmeta", text: list.length + " من " + (g.maxPlayers ?? "-") + " طالب" }),
+          names.length ? el("ul", { class: "plist" }, names) : el("div", { class: "gmeta", text: "ما في طلاب مسجلين" }),
+        ]));
+      });
+    }
+
+    load().catch(() => { $("top").innerHTML = "<p class='empty'>ما قدرنا نحمّل الصفحة الحين</p>"; });
+  </script>
+  <script type="module" src="maintenance.js"></script>
+</body>
+</html>

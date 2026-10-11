@@ -165,11 +165,11 @@
         const m = mosques[r.id] || {};
         const color = m.color || "#1E3A8A";
         const bar = el("div", { class: "bar", style: { background: color, width: "0%" } });
-        board.appendChild(el("div", { class: "row" }, [
+        board.appendChild(el("div", { class: "row", style: { cursor: "pointer" }, onclick: () => { location.href = "mosque.html?id=" + r.id; } }, [
           el("div", { class: "rank", text: String(i + 1) }),
           el("div", { class: "info" }, [
             el("div", { class: "name" }, [
-              el("span", { class: "dot", style: { background: color } }),
+              m.logo ? el("img", { src: m.logo, alt: "", style: { width: "26px", height: "26px", borderRadius: "8px", objectFit: "cover" } }) : el("span", { class: "dot", style: { background: color } }),
               el("span", { text: m.name || r.id }),
             ]),
             el("div", { class: "bar-wrap" }, [bar]),
