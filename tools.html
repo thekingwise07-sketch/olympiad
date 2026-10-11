@@ -70,9 +70,15 @@
       </section>
 
       <section class="card">
-        <h2>معاينة الموقع كزائر</h2>
-        <p class="hint">يفتح الصفحة الرئيسية للزائر في تبويب جديد. البيانات التجريبية ما تظهر فيها.</p>
-        <a class="btn ghost" href="home.html" target="_blank" rel="noopener">معاينة كزائر</a>
+        <h2>معاينة الأدوار</h2>
+        <p class="hint">تفتح الشاشات كما تبان لكل دور، في تبويب جديد. كآدمن، تقدر تسوي كل شي حتى وأنت بالمعاينة، فالمعاينة للشكل بس.</p>
+        <label for="previewRole">اختر الدور</label>
+        <select id="previewRole" style="width:100%;min-height:48px;padding:10px 14px;font:inherit;font-size:16px;border:1.5px solid #CBD5E1;border-radius:12px">
+          <option value="visitor">زائر</option>
+          <option value="supervisor">مشرف مسجد</option>
+          <option value="organizer">منظم</option>
+        </select>
+        <button id="previewBtn" type="button" class="ghost">فتح المعاينة</button>
       </section>
     </div>
   </main>
@@ -159,6 +165,13 @@
         $("testMsg").className = "msg err";
         $("testMsg").textContent = errText(e);
       }
+    });
+
+
+    $("previewBtn").addEventListener("click", () => {
+      const r = $("previewRole").value;
+      const page = r === "visitor" ? "home.html" : r === "supervisor" ? "students.html" : "matches.html";
+      window.open(page + "?preview=" + r, "_blank", "noopener");
     });
 
     // ---------- وضع البروفا ----------

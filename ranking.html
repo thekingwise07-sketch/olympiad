@@ -9,7 +9,7 @@
   <style>
     :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; --red:#B91C1C; --green:#166534; }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; }
+    body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; padding-bottom: 84px; }
     header { background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px; }
     header h1 { margin: 0; font-size: 20px; font-weight: 900; }
     header a { color: #fff; font-weight: 700; text-decoration: none; min-height: 48px; display: inline-flex; align-items: center; }
@@ -72,6 +72,15 @@
     </section>
   </main>
 
+  <nav>
+    <a href="home.html">الرئيسية</a>
+    <a href="matches-public.html">المباريات</a>
+    <a href="ranking.html">الترتيب</a>
+    <a href="mosques-public.html">المساجد</a>
+    <a href="news.html">الأخبار</a>
+    <a href="rules.html">القوانين</a>
+    <a href="index.html">دخول</a>
+  </nav>
   <script type="module">
     import { auth, db, tf } from "./firebase.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";

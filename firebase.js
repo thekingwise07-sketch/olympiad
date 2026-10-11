@@ -7,7 +7,7 @@ import {
   createUserWithEmailAndPassword,
   signOut as fbSignOut,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { initializeFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeFirestore, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ضع إعدادات مشروعك من Firebase Console > Project settings > Your apps
 export const firebaseConfig = {
@@ -71,4 +71,9 @@ export async function createAuthAccount(username, password) {
   const uid = cred.user.uid;
   await fbSignOut(sec);
   return uid;
+}
+
+// وضع البروفا: الآدمن يشوف البيانات التجريبية في كل الصفحات
+export function tf() {
+  return localStorage.getItem("proofMode") === "1" ? [] : [where("isTest", "==", false)];
 }

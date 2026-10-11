@@ -122,6 +122,29 @@
       $("top").appendChild(top);
       $("top").appendChild(stats);
 
+      // إحصائيات اللاعبين (من المباريات النهائية)
+      const pStats = {};
+      mtSnap.docs.map((d) => d.data()).forEach((mt) => {
+        Object.entries(mt.details?.players || {}).forEach(([pid, c]) => {
+          if (!playerIds.has(pid)) return;
+          const st = pStats[pid] || (pStats[pid] = { goals: 0, yellow: 0, red: 0, fouls: 0 });
+          st.goals += Number(c.goals || 0); st.yellow += Number(c.yellow || 0);
+          st.red += Number(c.red || 0); st.fouls += Number(c.fouls || 0);
+        });
+      });
+      const statsCard = document.createElement("div");
+      statsCard.className = "card";
+      statsCard.innerHTML = "<h2>إحصائيات اللاعبين</h2>";
+      if (!players.length) statsCard.appendChild(el("p", { class: "empty", text: "ما في لاعبين" }));
+      players.forEach((p) => {
+        const st = pStats[p.id] || { goals: 0, yellow: 0, red: 0, fouls: 0 };
+        statsCard.appendChild(el("div", { class: "game" }, [
+          el("div", { class: "gname", text: p.name || "-" }),
+          el("div", { class: "gmeta", text: "أهداف " + st.goals + " · صفراء " + st.yellow + " · حمراء " + st.red + " · فاولات " + st.fouls }),
+        ]));
+      });
+      $("top").parentElement.insertBefore(statsCard, $("top").nextElementSibling);
+
       // الفرق: اسم الفريق + مشرفه + لاعبيه
       const teamsBox = document.createElement("div");
       teamsBox.className = "card";

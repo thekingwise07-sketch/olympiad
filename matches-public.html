@@ -30,6 +30,7 @@
     <a href="home.html">الرئيسية</a>
     <a href="matches-public.html">المباريات</a>
     <a href="ranking.html">الترتيب</a>
+    <a href="mosques-public.html">المساجد</a>
     <a href="news.html">الأخبار</a>
     <a href="rules.html">القوانين</a>
     <a href="index.html">دخول</a>
@@ -81,9 +82,38 @@
         if (isSprint && m.details?.ranking?.length) {
           kids.push(el("div", { class: "scorers", text: "الترتيب: " + m.details.ranking.map((r, i) => (i + 1) + ". " + r.name).join("، ") }));
         }
+        if (!isSprint) {
+          kids.push(el("button", { class: "ghost", type: "button", text: "شارك النتيجة", onclick: () => shareCard(teams, g.name || "", (m.scoreA ?? 0) + " - " + (m.scoreB ?? 0)) }));
+        }
         list.appendChild(el("div", { class: "card" }, kids));
       });
     }
+
+    // بطاقة النتيجة كصورة للمشاركة (واتساب وستوري)
+    async function shareCard(teams, game, score) {
+      const c = document.createElement("canvas");
+      c.width = 1080; c.height = 1080;
+      const x = c.getContext("2d");
+      x.fillStyle = "#1E3A8A"; x.fillRect(0, 0, 1080, 1080);
+      x.fillStyle = "#D4A937"; x.font = "bold 60px Tajawal, sans-serif"; x.textAlign = "center";
+      x.fillText("أولمبياد المساجد", 540, 150);
+      x.fillStyle = "#ffffff"; x.font = "bold 46px Tajawal, sans-serif";
+      x.fillText(game, 540, 260);
+      x.font = "bold 58px Tajawal, sans-serif";
+      x.fillText(teams, 540, 520);
+      x.fillStyle = "#D4A937"; x.font = "bold 180px Tajawal, sans-serif";
+      x.fillText(score, 540, 760);
+      const blob = await new Promise((r) => c.toBlob(r, "image/png"));
+      const file = new File([blob], "result.png", { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: "نتيجة المباراة" }); return; } catch (e) { /* يرجع للتحميل */ }
+      }
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "result.png";
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+
     load().catch(() => { $("list").innerHTML = ""; $("list").appendChild(el("p", { class: "empty", text: "ما قدرنا نحمّل المباريات الحين" })); });
   </script>
   <script type="module" src="maintenance.js"></script>

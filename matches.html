@@ -57,6 +57,11 @@
         <label for="gameSelect">اللعبة</label>
         <select id="gameSelect"></select>
 
+        <label for="matchDate">تاريخ المباراة</label>
+        <input id="matchDate" type="date" style="width:100%;min-height:48px;padding:10px 14px;font:inherit;font-size:16px;border:1.5px solid #CBD5E1;border-radius:12px">
+        <label for="matchTime">وقت المباراة</label>
+        <input id="matchTime" type="time" style="width:100%;min-height:48px;padding:10px 14px;font:inherit;font-size:16px;border:1.5px solid #CBD5E1;border-radius:12px">
+
         <label for="mosqueA">الفريق الأول (المسجد)</label>
         <select id="mosqueA"></select>
 
@@ -188,7 +193,7 @@
             el("span", { class: "score", text: (m.scoreA ?? 0) + " - " + (m.scoreB ?? 0) }),
           ]),
           el("div", { class: "teams", text: m.mosqueA ? mosqueName(m.mosqueA) + " ضد " + mosqueName(m.mosqueB) : "سباق الضاحية" }),
-          el("div", { class: "meta", text: gameName(m.gameId) }),
+          el("div", { class: "meta", text: gameName(m.gameId) + (m.matchDate ? " · " + m.matchDate + " " + (m.matchTime || "") : "") }),
           el("div", { class: "row" }, [
             ...(["football", "volleyball", "sprint"].includes(((games.find((g) => g.id === m.gameId)) || {}).type) ? [el("button", { class: "ghost", type: "button", text: "تفاصيل المباراة", onclick: () => { location.href = "match.html?id=" + m.id; } })] : []),
             ...(canEdit ? [el("button", { class: "ghost", type: "button", text: final ? "تصحيح" : "تعديل", onclick: () => startEdit(m) })] : []),
@@ -206,15 +211,16 @@
       const scoreA = Number($("scoreA").value);
       const scoreB = Number($("scoreB").value);
       if (!gameId) throw new Error("اختر اللعبة");
+      const dateTime = { matchDate: $("matchDate").value || null, matchTime: $("matchTime").value || null };
       if ((games.find((g) => g.id === gameId) || {}).type === "sprint") {
-        return { gameId, mosqueA: "", mosqueB: "", scoreA: 0, scoreB: 0 };
+        return { gameId, mosqueA: "", mosqueB: "", scoreA: 0, scoreB: 0, ...dateTime };
       }
       if (!mosqueA || !mosqueB) throw new Error("اختر الفريقين");
       if (mosqueA === mosqueB) throw new Error("الفريقين لازم يكونوا مسجدين مختلفين");
       for (const v of [scoreA, scoreB]) {
         if (!Number.isInteger(v) || v < 0 || v > 99) throw new Error("النتيجة لازم تكون رقم بين 0 و99");
       }
-      return { gameId, mosqueA, mosqueB, scoreA, scoreB };
+      return { gameId, mosqueA, mosqueB, scoreA, scoreB, ...dateTime };
     }
 
     function resetForm() {
@@ -295,5 +301,6 @@
     }
   </script>
   <script type="module" src="maintenance.js"></script>
+  <script>(function(){var p=new URLSearchParams(location.search).get("preview");if(!p)return;var d=document.createElement("div");d.setAttribute("style","position:sticky;top:0;z-index:99;background:#D4A937;color:#0F172A;padding:8px 12px;font-weight:700;text-align:center;font-family:Tajawal,system-ui,sans-serif");d.textContent="أنت تعاين كـ: "+({visitor:"زائر",supervisor:"مشرف مسجد",organizer:"منظم"}[p]||p)+" · الآدمن عنده كل الصلاحيات حتى بالمعاينة";document.body.prepend(d);})();</script>
 </body>
 </html>

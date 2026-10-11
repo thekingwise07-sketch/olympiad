@@ -204,6 +204,7 @@
       if (!confirm("متأكد؟ ما تقدر تعدّل بعدها، إلا بإذن الآدمن.")) return;
       try {
         await updateDoc(doc(db, "mosques", mosqueId), { locked: true, lockedAt: serverTimestamp(), lockedBy: me.uid });
+        await logAction("mosque.lock", mosqueId, {});
         mosquesMap[mosqueId] = { ...(mosquesMap[mosqueId] || {}), locked: true };
         await selectMosque(mosqueId);
       } catch (e) {
@@ -240,6 +241,7 @@
           status: "pending",
           createdAt: serverTimestamp(),
         });
+        await logAction("mosque.unlock_request", mosqueId, {});
         await loadUnlockRequest();
       } catch (e) {
         $("reqMsg").textContent = errText(e);
@@ -263,6 +265,7 @@
       try {
         const data = await compressLogo(f);
         await updateDoc(doc(db, "mosques", mosqueId), { logo: data, logoAt: serverTimestamp() });
+        await logAction("mosque.logo", mosqueId, {});
         mosquesMap[mosqueId] = { ...(mosquesMap[mosqueId] || {}), logo: data };
         showLogo();
         $("logoMsg").textContent = "تم تحديث الشعار";
@@ -305,6 +308,7 @@
       if (supervisorName.length < 2) return ($("teamMsg").textContent = "اكتب اسم مشرف الفريق");
       try {
         await addDoc(collection(db, "teams"), { name, supervisorName, mosqueId, isTest: false, createdAt: serverTimestamp(), createdBy: me.uid });
+        await logAction("team.create", mosqueId, { name, supervisorName });
         $("teamName").value = "";
         $("teamSup").value = "";
         await loadTeams();
@@ -318,10 +322,18 @@
       if (!confirm("حذف الفريق (" + (t.name || "") + ")؟ الطلاب المرتبطين يبقون بدون فريق.")) return;
       try {
         await deleteDoc(doc(db, "teams", t.id));
+        await logAction("team.delete", t.id, { name: t.name || "" });
         await loadTeams();
       } catch (e) {
         alert((e?.code ? "[" + e.code + "] " : "") + (e?.message || "صار خطأ"));
       }
+    }
+
+
+    async function logAction(action, targetId, details = {}) {
+      try {
+        await addDoc(collection(db, "auditLog"), { actorUid: me.uid, action, targetId: targetId || null, details, at: serverTimestamp() });
+      } catch (e) { /* السجل ما يوقف العملية */ }
     }
 
     // ---------- الإعدادات ----------
@@ -496,6 +508,7 @@
           });
           $("formOk").textContent = "تم تسجيل الطالب";
         }
+        await logAction(editingId ? "player.update" : "player.create", editingId || "", { name });
         resetForm();
         $("formOk").textContent = editingId ? "" : $("formOk").textContent;
         await loadStudents();
@@ -511,6 +524,7 @@
       if (!confirm("حذف الطالب (" + (s.name || "") + ")؟")) return;
       try {
         await deleteDoc(doc(db, "players", s.id));
+        await logAction("player.delete", s.id, { name: s.name || "" });
         await loadStudents();
       } catch (e) {
         alert(errText(e));
@@ -518,5 +532,6 @@
     }
   </script>
   <script type="module" src="maintenance.js"></script>
+  <script>(function(){var p=new URLSearchParams(location.search).get("preview");if(!p)return;var d=document.createElement("div");d.setAttribute("style","position:sticky;top:0;z-index:99;background:#D4A937;color:#0F172A;padding:8px 12px;font-weight:700;text-align:center;font-family:Tajawal,system-ui,sans-serif");d.textContent="أنت تعاين كـ: "+({visitor:"زائر",supervisor:"مشرف مسجد",organizer:"منظم"}[p]||p)+" · الآدمن عنده كل الصلاحيات حتى بالمعاينة";document.body.prepend(d);})();</script>
 </body>
 </html>

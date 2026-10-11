@@ -226,6 +226,7 @@
     }
 
     function change(pid, field, delta, valEl) {
+      if (navigator.vibrate) navigator.vibrate(15);
       const next = counters[pid][field] + delta;
       if (next < 0) return;
       counters[pid][field] = next;
