@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>أولمبياد المساجد</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; }
+    header { background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px; }
+    header strong { font-size: 20px; font-weight: 900; }
+    main { padding: 24px 16px; max-width: 560px; margin: 0 auto; }
+    .card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 4px 16px rgba(30,58,138,.08); margin-bottom: 16px; }
+    .card h2 { margin: 0 0 6px; color: var(--blue); font-size: 20px; }
+    .card p { margin: 0; color: #475569; line-height: 1.6; }
+    a.tile { display: block; text-decoration: none; color: var(--blue); font-weight: 700; background: #fff; border: 1.5px solid #E2E8F0; border-radius: 14px; padding: 16px; margin-bottom: 12px; min-height: 48px; }
+    button { min-height: 48px; padding: 0 18px; font: inherit; font-weight: 700; font-size: 16px; background: transparent; color: #fff; border: 1.5px solid rgba(255,255,255,.6); border-radius: 12px; cursor: pointer; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <strong id="name">...</strong>
+      <div id="role" style="color:var(--gold);font-weight:700;font-size:15px"></div>
+    </div>
+    <button id="logoutBtn" type="button">تسجيل خروج</button>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>أهلاً بك</h2>
+      <p>الصفحات الرئيسية (الأخبار، المباريات، الترتيب) تُبنى في المرحلة اللاحقة.</p>
+    </section>
+    <a class="tile hidden" id="adminLink" href="admin/accounts.html">إدارة الحسابات</a>
+  </main>
+
+  <script type="module">
+    import { auth, db, ROLE_LABELS } from "./js/firebase.js";
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return location.replace("index.html");
+
+      const snap = await getDoc(doc(db, "users", user.uid));
+      const p = snap.exists() ? snap.data() : null;
+
+      if (!p || p.disabled || p.deleted || p.mustChange) {
+        if (p && (p.disabled || p.deleted)) await signOut(auth);
+        return location.replace("index.html");
+      }
+
+      $("name").textContent = p.name || "";
+      $("role").textContent = ROLE_LABELS[p.role] || "";
+      if (p.role === "admin") $("adminLink").classList.remove("hidden");
+    });
+
+    $("logoutBtn").addEventListener("click", async () => {
+      await signOut(auth);
+      location.replace("index.html");
+    });
+  </script>
+</body>
+</html>

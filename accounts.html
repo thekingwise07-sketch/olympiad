@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>إدارة الحسابات</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; --red:#B91C1C; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; }
+    header { background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px; }
+    header h1 { margin: 0; font-size: 20px; font-weight: 900; }
+    header a { color: #fff; font-weight: 700; text-decoration: none; min-height: 48px; display: inline-flex; align-items: center; }
+    main { max-width: 640px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 4px 16px rgba(30,58,138,.08); margin-bottom: 16px; }
+    h2 { margin: 0 0 12px; font-size: 19px; color: var(--blue); }
+    label { display: block; margin: 12px 0 6px; font-weight: 700; color: var(--blue); }
+    input, select { width: 100%; min-height: 48px; padding: 10px 14px; font: inherit; font-size: 16px; border: 1.5px solid #CBD5E1; border-radius: 12px; background: #fff; }
+    input[dir="ltr"] { direction: ltr; text-align: right; }
+    input:disabled { background: #F1F5F9; color: #64748B; }
+    input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,169,55,.25); }
+    button { min-height: 48px; padding: 0 16px; margin-top: 16px; font: inherit; font-weight: 700; font-size: 16px; background: var(--blue); color: #fff; border: 0; border-radius: 12px; cursor: pointer; }
+    button.ghost { background: #fff; color: var(--blue); border: 1.5px solid var(--blue); }
+    button.danger { background: var(--red); }
+    button:disabled { opacity: .6; cursor: default; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .row button { margin-top: 0; flex: 1 1 auto; font-size: 15px; }
+    .err { color: var(--red); min-height: 22px; margin: 10px 0 0; font-size: 15px; }
+    .hidden { display: none !important; }
+    .user { border: 1.5px solid #E2E8F0; border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+    .user-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .user-name { font-weight: 900; font-size: 17px; }
+    .user-meta { color: #475569; font-size: 15px; margin-top: 4px; }
+    .badge { font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: #E0E7FF; color: var(--blue); white-space: nowrap; }
+    .badge.off { background: #FEE2E2; color: var(--red); }
+    .secret { background: #FFF8E1; border: 2px solid var(--gold); border-radius: 14px; padding: 18px; }
+    .secret code { display: block; direction: ltr; font-size: 22px; font-weight: 900; letter-spacing: 1px; background: #fff; padding: 12px; border-radius: 10px; margin: 10px 0; text-align: center; user-select: all; }
+    .empty { color: #64748B; text-align: center; padding: 16px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>إدارة الحسابات</h1>
+    <a href="../app.html">رجوع</a>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2 id="formTitle">إضافة حساب</h2>
+      <form id="accForm" autocomplete="off">
+        <label for="name">الاسم</label>
+        <input id="name" required maxlength="60">
+
+        <label for="username">اليوزر</label>
+        <input id="username" required dir="ltr" pattern="[a-z0-9._\-]{3,30}" autocapitalize="none">
+
+        <label for="role">الدور</label>
+        <select id="role">
+          <option value="supervisor">مسؤول</option>
+          <option value="organizer">منظم</option>
+          <option value="mosque_supervisor">مشرف مسجد</option>
+          <option value="admin">آدمن</option>
+        </select>
+
+        <div id="gameWrap" class="hidden">
+          <label for="gameId">اللعبة</label>
+          <select id="gameId"></select>
+        </div>
+
+        <div id="mosqueWrap" class="hidden">
+          <label for="mosqueId">المسجد</label>
+          <select id="mosqueId"></select>
+        </div>
+
+        <div class="row">
+          <button id="saveBtn" type="submit">حفظ</button>
+          <button id="cancelBtn" type="button" class="ghost hidden">إلغاء التعديل</button>
+        </div>
+        <p id="formErr" class="err" role="alert"></p>
+      </form>
+    </section>
+
+    <section id="secretBox" class="card secret hidden">
+      <h2>كلمة السر (تظهر مرة وحدة)</h2>
+      <p>للحساب: <b id="secretUser"></b></p>
+      <code id="secretPw"></code>
+      <div class="row">
+        <button id="copyBtn" type="button" class="ghost">نسخ</button>
+        <button id="closeSecret" type="button">تم، حفظتها</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>الحسابات</h2>
+      <div id="list"><p class="empty">جاري التحميل...</p></div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { auth, db, ROLE_LABELS, genPassword, createAuthAccount, usernameToEmail } from "../js/firebase.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import {
+      collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, query, orderBy, serverTimestamp,
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+    const USERNAME_RE = /^[a-z0-9._-]{3,30}$/;
+
+    let me = null;          // { uid, ...profile } للآدمن الحالي
+    let editingUid = null;
+    let gamesMap = {};
+    let mosquesMap = {};
+
+    // ---------- حماية الصفحة ----------
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return location.replace("../index.html");
+      const snap = await getDoc(doc(db, "users", user.uid));
+      const p = snap.exists() ? snap.data() : null;
+      if (!p || p.role !== "admin" || p.disabled || p.deleted || p.mustChange) {
+        return location.replace("../app.html");
+      }
+      me = { uid: user.uid, ...p };
+      await loadLookups();
+      await loadUsers();
+    });
+
+    // ---------- مساعدات DOM (بدون innerHTML) ----------
+    function el(tag, props = {}, children = []) {
+      const node = document.createElement(tag);
+      Object.entries(props).forEach(([k, v]) => {
+        if (k === "class") node.className = v;
+        else if (k === "text") node.textContent = v;
+        else node[k] = v;
+      });
+      children.forEach((c) => node.appendChild(c));
+      return node;
+    }
+
+    const errText = (e) => e?.message || "صار خطأ، حاول مرة ثانية";
+
+    function fillSelect(select, entries, emptyLabel) {
+      select.innerHTML = "";
+      if (!entries.length) {
+        select.appendChild(el("option", { value: "", text: emptyLabel }));
+        return;
+      }
+      entries.forEach(([id, label]) => select.appendChild(el("option", { value: id, text: label })));
+    }
+
+    async function audit(action, targetUid, details = {}) {
+      await addDoc(collection(db, "auditLog"), {
+        actorUid: me.uid, action, targetUid: targetUid || null, details, at: serverTimestamp(),
+      });
+    }
+
+    // ---------- الألعاب والمساجد ----------
+    async function loadLookups() {
+      const [gSnap, mSnap] = await Promise.all([getDocs(collection(db, "games")), getDocs(collection(db, "mosques"))]);
+      gamesMap = Object.fromEntries(gSnap.docs.map((d) => [d.id, d.data().name || d.id]));
+      mosquesMap = Object.fromEntries(mSnap.docs.map((d) => [d.id, d.data().name || d.id]));
+      fillSelect($("gameId"), Object.entries(gamesMap), "ما في ألعاب بعد");
+      fillSelect($("mosqueId"), Object.entries(mosquesMap), "ما في مساجد بعد");
+    }
+
+    // ---------- قائمة الحسابات ----------
+    async function loadUsers() {
+      const snap = await getDocs(query(collection(db, "users"), orderBy("name")));
+      const list = $("list");
+      list.innerHTML = "";
+      const visible = snap.docs.filter((d) => !d.data().deleted);
+      if (!visible.length) {
+        list.appendChild(el("p", { class: "empty", text: "ما في حسابات بعد" }));
+        return;
+      }
+      visible.forEach((d) => list.appendChild(renderUser(d.id, d.data())));
+    }
+
+    function scopeLabel(u) {
+      if (u.role === "organizer") return "اللعبة: " + (gamesMap[u.gameId] || u.gameId || "-");
+      if (u.role === "mosque_supervisor") return "المسجد: " + (mosquesMap[u.mosqueId] || u.mosqueId || "-");
+      return "";
+    }
+
+    function renderUser(uid, u) {
+      const off = !!u.disabled;
+      const isSelf = uid === me.uid;
+      const scope = scopeLabel(u);
+      const badge = el("span", { class: "badge" + (off ? " off" : ""), text: off ? "معطّل" : (ROLE_LABELS[u.role] || u.role) });
+
+      const head = el("div", { class: "user-head" }, [
+        el("div", {}, [
+          el("div", { class: "user-name", text: u.name || "-" }),
+          el("div", { class: "user-meta", text: "@" + (u.username || "") + (scope ? " · " + scope : "") }),
+        ]),
+        badge,
+      ]);
+
+      const actions = el("div", { class: "row" }, [
+        el("button", { class: "ghost", type: "button", text: "تعديل", onclick: () => startEdit(uid, u) }),
+        el("button", { class: "ghost", type: "button", text: off ? "تفعيل" : "تعطيل", disabled: isSelf, onclick: () => toggleDisabled(uid, !off) }),
+        el("button", { class: "ghost", type: "button", text: "إعادة تعيين كلمة السر", disabled: isSelf, onclick: () => resetPw(uid, u) }),
+        el("button", { class: "danger", type: "button", text: "حذف", disabled: isSelf, onclick: () => removeUser(uid, u) }),
+      ]);
+
+      return el("div", { class: "user" }, [head, actions]);
+    }
+
+    // ---------- الفورم ----------
+    function syncScopeFields() {
+      const r = $("role").value;
+      $("gameWrap").classList.toggle("hidden", r !== "organizer");
+      $("mosqueWrap").classList.toggle("hidden", r !== "mosque_supervisor");
+    }
+    $("role").addEventListener("change", syncScopeFields);
+
+    function resetForm() {
+      editingUid = null;
+      $("accForm").reset();
+      $("username").disabled = false;
+      $("formTitle").textContent = "إضافة حساب";
+      $("saveBtn").textContent = "حفظ";
+      $("cancelBtn").classList.add("hidden");
+      $("formErr").textContent = "";
+      syncScopeFields();
+    }
+    $("cancelBtn").addEventListener("click", resetForm);
+
+    function startEdit(uid, u) {
+      editingUid = uid;
+      $("name").value = u.name || "";
+      $("username").value = u.username || "";
+      $("username").disabled = true;
+      $("role").value = u.role;
+      if (u.gameId) $("gameId").value = u.gameId;
+      if (u.mosqueId) $("mosqueId").value = u.mosqueId;
+      syncScopeFields();
+      $("formTitle").textContent = "تعديل: " + (u.username || "");
+      $("saveBtn").textContent = "حفظ التعديل";
+      $("cancelBtn").classList.remove("hidden");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function readPayload() {
+      const role = $("role").value;
+      const name = $("name").value.trim();
+      if (name.length < 2 || name.length > 60) throw new Error("الاسم لازم يكون بين 2 و60 حرف");
+      if (role === "organizer" && !$("gameId").value) throw new Error("اختر اللعبة للمنظم");
+      if (role === "mosque_supervisor" && !$("mosqueId").value) throw new Error("اختر المسجد لمشرف المسجد");
+      return {
+        name,
+        role,
+        gameId: role === "organizer" ? $("gameId").value : null,
+        mosqueId: role === "mosque_supervisor" ? $("mosqueId").value : null,
+      };
+    }
+
+    $("accForm").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const btn = $("saveBtn");
+      btn.disabled = true;
+      $("formErr").textContent = "";
+
+      try {
+        const payload = readPayload();
+
+        if (editingUid) {
+          if (editingUid === me.uid && payload.role !== "admin") {
+            throw new Error("ما تقدر تغيّر دورك أنت");
+          }
+          await updateDoc(doc(db, "users", editingUid), { ...payload, updatedAt: serverTimestamp() });
+          await audit("account.update", editingUid, { role: payload.role });
+          resetForm();
+        } else {
+          const username = $("username").value.trim().toLowerCase();
+          if (!USERNAME_RE.test(username)) throw new Error("اليوزر: أحرف إنجليزية وأرقام و . _ - فقط (من 3 إلى 30)");
+
+          const password = genPassword();
+          const uid = await createAuthAccount(username, password);
+          await setDoc(doc(db, "users", uid), {
+            ...payload,
+            username,
+            disabled: false,
+            deleted: false,
+            mustChange: true,
+            createdAt: serverTimestamp(),
+            createdBy: me.uid,
+          });
+          await audit("account.create", uid, { username, role: payload.role });
+          showSecret(username, password);
+          resetForm();
+        }
+        await loadUsers();
+      } catch (e) {
+        $("formErr").textContent = e?.code === "auth/email-already-exists"
+          ? "اليوزر مستخدم قبل"
+          : errText(e);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // ---------- كلمة السر المؤقتة ----------
+    function showSecret(username, password) {
+      $("secretUser").textContent = username;
+      $("secretPw").textContent = password;
+      $("secretBox").classList.remove("hidden");
+      $("secretBox").scrollIntoView({ behavior: "smooth" });
+    }
+
+    $("copyBtn").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText($("secretPw").textContent);
+        $("copyBtn").textContent = "تم النسخ";
+      } catch {
+        $("copyBtn").textContent = "انسخها يدوياً";
+      }
+    });
+
+    $("closeSecret").addEventListener("click", () => {
+      $("secretPw").textContent = "";
+      $("secretUser").textContent = "";
+      $("copyBtn").textContent = "نسخ";
+      $("secretBox").classList.add("hidden");
+    });
+
+    // ---------- الإجراءات ----------
+    async function toggleDisabled(uid, disabled) {
+      if (!confirm(disabled ? "تعطيل هذا الحساب؟ ما بيقدر يدخل ولا يقرأ شي." : "تفعيل هذا الحساب؟")) return;
+      try {
+        await updateDoc(doc(db, "users", uid), { disabled, updatedAt: serverTimestamp() });
+        await audit(disabled ? "account.disable" : "account.enable", uid);
+        await loadUsers();
+      } catch (e) {
+        alert(errText(e));
+      }
+    }
+
+    // إعادة التعيين: حساب جديد بنفس الدور والنطاق، والقديم يتعطّل ويرتبط بالجديد
+    async function resetPw(uid, u) {
+      if (!confirm("إعادة التعيين تنشئ حساب جديد وتعطّل القديم. تكمل؟")) return;
+      try {
+        const newUsername = `${u.username}-${Math.floor(1000 + Math.random() * 9000)}`;
+        const password = genPassword();
+        const newUid = await createAuthAccount(newUsername, password);
+
+        await setDoc(doc(db, "users", newUid), {
+          name: u.name,
+          username: newUsername,
+          role: u.role,
+          gameId: u.gameId ?? null,
+          mosqueId: u.mosqueId ?? null,
+          disabled: false,
+          deleted: false,
+          mustChange: true,
+          replacedFrom: uid,
+          createdAt: serverTimestamp(),
+          createdBy: me.uid,
+        });
+        await updateDoc(doc(db, "users", uid), {
+          disabled: true,
+          replacedBy: newUid,
+          updatedAt: serverTimestamp(),
+        });
+        await audit("account.reset_password", uid, { newUid });
+
+        showSecret(newUsername, password);
+        await loadUsers();
+      } catch (e) {
+        alert(errText(e));
+      }
+    }
+
+    // الحذف: تعطيل نهائي وإخفاء. الحساب القديم يضل بدون صلاحيات
+    async function removeUser(uid, u) {
+      if (!confirm("حذف الحساب (" + (u.name || "") + ")؟ ما يقدر يدخل ولا يرجع.")) return;
+      try {
+        await updateDoc(doc(db, "users", uid), {
+          disabled: true,
+          deleted: true,
+          deletedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        await audit("account.delete", uid, { username: u.username });
+        await loadUsers();
+      } catch (e) {
+        alert(errText(e));
+      }
+    }
+
+    syncScopeFields();
+  </script>
+</body>
+</html>

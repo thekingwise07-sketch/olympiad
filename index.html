@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>أولمبياد المساجد - تسجيل الدخول</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; --radius:14px; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; }
+    header { background: var(--blue); color: #fff; text-align: center; padding: calc(28px + env(safe-area-inset-top, 0px)) 20px 28px; }
+    header h1 { margin: 0; font-size: 24px; font-weight: 900; }
+    header span { color: var(--gold); font-weight: 700; }
+    main { flex: 1; display: flex; justify-content: center; padding: 24px 16px; }
+    .card { width: 100%; max-width: 400px; background: #fff; border-radius: var(--radius); padding: 24px; box-shadow: 0 4px 16px rgba(30,58,138,.08); }
+    h2 { margin: 0 0 8px; font-size: 20px; color: var(--blue); }
+    p.hint { margin: 0 0 8px; color: #475569; font-size: 15px; line-height: 1.6; }
+    label { display: block; margin: 14px 0 6px; font-weight: 700; color: var(--blue); }
+    input { width: 100%; min-height: 48px; padding: 10px 14px; font: inherit; font-size: 17px; border: 1.5px solid #CBD5E1; border-radius: 12px; background: #fff; direction: ltr; text-align: right; }
+    input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,169,55,.25); }
+    button { width: 100%; min-height: 48px; margin-top: 20px; font: inherit; font-size: 17px; font-weight: 700; background: var(--blue); color: #fff; border: 0; border-radius: 12px; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: default; }
+    .err { color: #B91C1C; min-height: 22px; margin: 12px 0 0; font-size: 15px; line-height: 1.5; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <header><h1>أولمبياد <span>المساجد</span></h1></header>
+
+  <main>
+    <section class="card" id="loginStep">
+      <h2>تسجيل الدخول</h2>
+      <p class="hint">ادخل باليوزر وكلمة السر اللي عطاك إياها الآدمن.</p>
+      <form id="loginForm">
+        <label for="username">اليوزر</label>
+        <input id="username" autocomplete="username" required dir="ltr" autocapitalize="none">
+        <label for="password">كلمة السر</label>
+        <input id="password" type="password" autocomplete="current-password" required dir="ltr">
+        <button id="loginBtn" type="submit">دخول</button>
+        <p id="loginErr" class="err" role="alert"></p>
+      </form>
+    </section>
+
+    <section class="card hidden" id="changeStep">
+      <h2>أول دخول: غيّر كلمة السر</h2>
+      <p class="hint">كلمة السر المؤقتة لازم تتغيّر قبل ما تكمل. لا تقل عن 8 أحرف.</p>
+      <form id="changeForm" autocomplete="off">
+        <label for="newPw">كلمة السر الجديدة</label>
+        <input id="newPw" type="password" minlength="8" required dir="ltr" autocomplete="new-password">
+        <label for="newPw2">أعد كتابة كلمة السر</label>
+        <input id="newPw2" type="password" minlength="8" required dir="ltr" autocomplete="new-password">
+        <button id="changeBtn" type="submit">حفظ والدخول</button>
+        <p id="changeErr" class="err" role="alert"></p>
+      </form>
+    </section>
+  </main>
+
+  <script type="module">
+    import { auth, db, usernameToEmail } from "./js/firebase.js";
+    import {
+      signInWithEmailAndPassword,
+      onAuthStateChanged,
+      updatePassword,
+      signOut,
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+
+    const ERRORS = {
+      "auth/invalid-credential": "اليوزر أو كلمة السر غلط",
+      "auth/invalid-email": "اليوزر غلط",
+      "auth/user-disabled": "هذا الحساب معطّل، كلّم الآدمن",
+      "auth/too-many-requests": "محاولات كثيرة، جرّب بعد شوي",
+      "auth/network-request-failed": "ما في اتصال بالإنترنت",
+      "auth/weak-password": "كلمة السر ضعيفة، لازم 8 أحرف على الأقل",
+      "auth/requires-recent-login": "سجّل دخولك من جديد وحاول مرة ثانية",
+    };
+    const errorText = (e) => ERRORS[e?.code] || "صار خطأ، حاول مرة ثانية";
+
+    function showChangeStep() {
+      $("loginStep").classList.add("hidden");
+      $("changeStep").classList.remove("hidden");
+    }
+
+    async function routeUser(user) {
+      const snap = await getDoc(doc(db, "users", user.uid));
+      const p = snap.exists() ? snap.data() : null;
+
+      if (!p || p.disabled || p.deleted) {
+        await signOut(auth);
+        $("loginErr").textContent = !p
+          ? "الحساب ما له ملف، كلّم الآدمن"
+          : "هذا الحساب معطّل، كلّم الآدمن";
+        $("loginBtn").disabled = false;
+        return;
+      }
+      if (p.mustChange) {
+        showChangeStep();
+        return;
+      }
+      location.replace("app.html");
+    }
+
+    // جلسة محفوظة من قبل
+    onAuthStateChanged(auth, (user) => {
+      if (user) routeUser(user).catch(() => { $("loginErr").textContent = "ما قدرنا نتحقق من الحساب، حاول مرة ثانية"; });
+    });
+
+    $("loginForm").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      $("loginBtn").disabled = true;
+      $("loginErr").textContent = "";
+      try {
+        const username = $("username").value.trim().toLowerCase();
+        await signInWithEmailAndPassword(auth, usernameToEmail(username), $("password").value);
+        // onAuthStateChanged يتولى التوجيه
+      } catch (e) {
+        $("loginErr").textContent = errorText(e);
+        $("loginBtn").disabled = false;
+      }
+    });
+
+    $("changeForm").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const p1 = $("newPw").value;
+      const p2 = $("newPw2").value;
+      $("changeErr").textContent = "";
+
+      if (p1 !== p2) return ($("changeErr").textContent = "كلمتا السر ما بتتطابقوا");
+      if (p1.length < 8) return ($("changeErr").textContent = "لازم 8 أحرف على الأقل");
+
+      $("changeBtn").disabled = true;
+      try {
+        await updatePassword(auth.currentUser, p1);
+        await updateDoc(doc(db, "users", auth.currentUser.uid), { mustChange: false });
+        location.replace("app.html");
+      } catch (e) {
+        $("changeErr").textContent = errorText(e);
+        $("changeBtn").disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
