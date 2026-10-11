@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>تسجيل الطلاب</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; --red:#B91C1C; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; min-height: 100vh; }
+    header { background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px; }
+    header h1 { margin: 0; font-size: 20px; font-weight: 900; }
+    header a { color: #fff; font-weight: 700; text-decoration: none; min-height: 48px; display: inline-flex; align-items: center; }
+    main { max-width: 640px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 4px 16px rgba(30,58,138,.08); margin-bottom: 16px; }
+    h2 { margin: 0 0 12px; font-size: 19px; color: var(--blue); }
+    label { display: block; margin: 12px 0 6px; font-weight: 700; color: var(--blue); }
+    input, select { width: 100%; min-height: 48px; padding: 10px 14px; font: inherit; font-size: 16px; border: 1.5px solid #CBD5E1; border-radius: 12px; background: #fff; }
+    input[type="number"] { direction: ltr; text-align: right; }
+    input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,169,55,.25); }
+    button { min-height: 48px; padding: 0 16px; margin-top: 16px; font: inherit; font-weight: 700; font-size: 16px; background: var(--blue); color: #fff; border: 0; border-radius: 12px; cursor: pointer; }
+    button.ghost { background: #fff; color: var(--blue); border: 1.5px solid var(--blue); }
+    button.danger { background: var(--red); }
+    button:disabled { opacity: .5; cursor: default; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .row button { margin-top: 0; flex: 1 1 auto; font-size: 15px; }
+    .err { color: var(--red); min-height: 22px; margin: 10px 0 0; font-size: 15px; }
+    .ok { color: #166534; min-height: 22px; margin: 10px 0 0; font-size: 15px; }
+    .hidden { display: none !important; }
+    .notice { background: #FEF3C7; color: #92400E; border-radius: 12px; padding: 12px; margin-bottom: 12px; font-weight: 700; }
+    .check { display: flex; align-items: center; gap: 10px; border: 1.5px solid #E2E8F0; border-radius: 12px; padding: 10px 12px; margin-top: 8px; min-height: 48px; }
+    .check input { width: 22px; height: 22px; min-height: 0; }
+    .check.full { opacity: .5; }
+    .cap { display: flex; justify-content: space-between; border-bottom: 1px solid #E2E8F0; padding: 10px 0; font-size: 16px; }
+    .cap b { color: var(--blue); }
+    .item { border: 1.5px solid #E2E8F0; border-radius: 14px; padding: 12px; margin-bottom: 10px; }
+    .item-name { font-weight: 900; font-size: 17px; }
+    .item-meta { color: #475569; font-size: 14px; margin: 4px 0 8px; }
+    .empty { color: #64748B; text-align: center; padding: 16px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>تسجيل الطلاب</h1>
+    <a href="app.html">رجوع</a>
+  </header>
+
+  <main>
+    <div id="lockNotice" class="notice hidden">المسجد مقفول، ما تقدر تعدّل التسجيل إلا بإذن الآدمن.</div>
+    <div id="noMosque" class="notice hidden">ما في مسجد مربوط بحسابك، كلّم الآدمن.</div>
+
+    <section class="card hidden" id="adminCard">
+      <h2>الإعدادات</h2>
+      <label for="maxGamesInput">الحد الأقصى للألعاب لكل طالب</label>
+      <input id="maxGamesInput" type="number" min="1" max="20" dir="ltr">
+      <div class="row"><button id="saveLimitBtn" type="button">حفظ الحد</button></div>
+      <p id="limitMsg" class="ok"></p>
+    </section>
+
+    <section class="card">
+      <h2>المسجد</h2>
+      <div id="mosqueSelectWrap" class="hidden">
+        <label for="mosqueSelect">اختر المسجد</label>
+        <select id="mosqueSelect"></select>
+      </div>
+      <p id="mosqueName" class="item-name"></p>
+      <p id="maxInfo" class="item-meta"></p>
+    </section>
+
+    <section class="card">
+      <h2>السعة في كل لعبة</h2>
+      <div id="capList"><p class="empty">جاري التحميل...</p></div>
+    </section>
+
+    <section class="card">
+      <h2 id="formTitle">إضافة طالب</h2>
+      <form id="studentForm" autocomplete="off" onsubmit="return false;">
+        <label for="studentName">اسم الطالب</label>
+        <input id="studentName" maxlength="60">
+
+        <label>الألعاب المسجّل فيها</label>
+        <div id="gamesBox"></div>
+
+        <div class="row">
+          <button id="saveBtn" type="button">حفظ</button>
+          <button id="cancelBtn" type="button" class="ghost hidden">إلغاء التعديل</button>
+        </div>
+        <p id="formErr" class="err" role="alert"></p>
+        <p id="formOk" class="ok"></p>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>الطلاب</h2>
+      <div id="list"><p class="empty">جاري التحميل...</p></div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { auth, db } from "./firebase.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import {
+      collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, setDoc, query, where, serverTimestamp,
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+    let me = null;
+    let mosqueId = null;
+    let mosqueLocked = false;
+    let maxGames = 2;
+    let games = [];
+    let students = [];
+    let mosquesMap = {};
+    let editingId = null;
+
+    // ---------- الحماية: الآدمن ومشرف المسجد فقط ----------
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return location.replace("index.html");
+      const snap = await getDoc(doc(db, "users", user.uid));
+      const p = snap.exists() ? snap.data() : null;
+      if (!p || p.disabled || p.deleted || p.mustChange || !["admin", "mosque_supervisor"].includes(p.role)) {
+        return location.replace("app.html");
+      }
+      me = { uid: user.uid, ...p };
+
+      const mSnap = await getDocs(collection(db, "mosques"));
+      mosquesMap = Object.fromEntries(mSnap.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
+
+      if (me.role === "admin") {
+        $("adminCard").classList.remove("hidden");
+        $("mosqueSelectWrap").classList.remove("hidden");
+        const opts = Object.values(mosquesMap).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+        const sel = $("mosqueSelect");
+        sel.innerHTML = "";
+        opts.forEach((m) => sel.appendChild(el("option", { value: m.id, text: m.name || m.id })));
+        sel.addEventListener("change", () => selectMosque(sel.value));
+        if (opts.length) selectMosque(opts[0].id);
+        else $("noMosque").classList.remove("hidden");
+      } else {
+        if (!me.mosqueId) {
+          $("noMosque").classList.remove("hidden");
+          return;
+        }
+        selectMosque(me.mosqueId);
+      }
+      await loadLimit();
+    });
+
+    function el(tag, props = {}, children = []) {
+      const node = document.createElement(tag);
+      Object.entries(props).forEach(([k, v]) => {
+        if (k === "class") node.className = v;
+        else if (k === "text") node.textContent = v;
+        else node[k] = v;
+      });
+      children.forEach((c) => node.appendChild(c));
+      return node;
+    }
+
+    const errText = (e) => (e?.code ? "[" + e.code + "] " : "") + (e?.message || "صار خطأ، حاول مرة ثانية");
+
+    async function selectMosque(id) {
+      mosqueId = id;
+      const m = mosquesMap[id] || {};
+      mosqueLocked = m.locked === true;
+      $("mosqueName").textContent = m.name || id;
+      $("lockNotice").classList.toggle("hidden", !mosqueLocked);
+      resetForm();
+      await loadGames();
+      await loadStudents();
+    }
+
+    // ---------- الإعدادات ----------
+    async function loadLimit() {
+      const snap = await getDoc(doc(db, "settings", "studentLimits"));
+      maxGames = snap.exists() && snap.data().maxGamesPerStudent ? snap.data().maxGamesPerStudent : 2;
+      $("maxInfo").textContent = "الحد الأقصى للألعاب لكل طالب: " + maxGames;
+      $("maxGamesInput").value = maxGames;
+    }
+
+    $("saveLimitBtn").addEventListener("click", async () => {
+      const n = Number($("maxGamesInput").value);
+      if (!Number.isInteger(n) || n < 1 || n > 20) {
+        $("limitMsg").className = "err";
+        $("limitMsg").textContent = "الرقم لازم يكون بين 1 و20";
+        return;
+      }
+      try {
+        await setDoc(doc(db, "settings", "studentLimits"), { maxGamesPerStudent: n, updatedAt: serverTimestamp() }, { merge: true });
+        maxGames = n;
+        $("maxInfo").textContent = "الحد الأقصى للألعاب لكل طالب: " + maxGames;
+        $("limitMsg").className = "ok";
+        $("limitMsg").textContent = "تم حفظ الحد";
+      } catch (e) {
+        $("limitMsg").className = "err";
+        $("limitMsg").textContent = errText(e);
+      }
+    });
+
+    // ---------- الألعاب والسعة ----------
+    async function loadGames() {
+      const snap = await getDocs(query(collection(db, "games"), where("isTest", "==", false)));
+      games = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((g) => !g.archived);
+      games.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+      renderGamesBox();
+      renderCapacity();
+    }
+
+    function countFor(gameId, excludeId = null) {
+      return students.filter((s) => s.id !== excludeId && (s.games || []).includes(gameId)).length;
+    }
+
+    function renderCapacity() {
+      const list = $("capList");
+      list.innerHTML = "";
+      if (!games.length) {
+        list.appendChild(el("p", { class: "empty", text: "ما في ألعاب مفعّلة بعد" }));
+        return;
+      }
+      games.forEach((g) => {
+        list.appendChild(el("div", { class: "cap" }, [
+          el("span", { text: g.name || "-" }),
+          el("b", { text: countFor(g.id) + " من " + (g.maxPlayers ?? "-") }),
+        ]));
+      });
+    }
+
+    function renderGamesBox(selected = []) {
+      const box = $("gamesBox");
+      box.innerHTML = "";
+      if (!games.length) {
+        box.appendChild(el("p", { class: "empty", text: "ما في ألعاب مفعّلة" }));
+        return;
+      }
+      games.forEach((g) => {
+        const cnt = countFor(g.id, editingId);
+        const full = cnt >= (g.maxPlayers ?? 0) && !selected.includes(g.id);
+        const cb = el("input", { type: "checkbox", value: g.id, checked: selected.includes(g.id), disabled: full || mosqueLocked });
+        box.appendChild(el("label", { class: "check" + (full ? " full" : ""), style: { margin: "8px 0 0" } }, [
+          cb,
+          el("span", { text: (g.name || "-") + " (" + cnt + " من " + (g.maxPlayers ?? "-") + ")" + (full ? " - مكتملة" : "") }),
+        ]));
+      });
+    }
+
+    // ---------- الطلاب ----------
+    async function loadStudents() {
+      if (!mosqueId) return;
+      const snap = await getDocs(query(
+        collection(db, "players"),
+        where("mosqueId", "==", mosqueId),
+        where("isTest", "==", false)
+      ));
+      students = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      students.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+      renderList();
+      renderCapacity();
+      renderGamesBox(currentSelection());
+    }
+
+    function gameNameOf(id) {
+      return (games.find((g) => g.id === id) || {}).name || id;
+    }
+
+    function renderList() {
+      const list = $("list");
+      list.innerHTML = "";
+      if (!students.length) {
+        list.appendChild(el("p", { class: "empty", text: "ما في طلاب مسجّلين بعد" }));
+        return;
+      }
+      students.forEach((s) => {
+        list.appendChild(el("div", { class: "item" }, [
+          el("div", { class: "item-name", text: s.name || "-" }),
+          el("div", { class: "item-meta", text: (s.games || []).map(gameNameOf).join("، ") || "بدون ألعاب" }),
+          el("div", { class: "row" }, [
+            el("button", { class: "ghost", type: "button", text: "تعديل", disabled: mosqueLocked, onclick: () => startEdit(s) }),
+            el("button", { class: "danger", type: "button", text: "حذف", disabled: mosqueLocked, onclick: () => removeStudent(s) }),
+          ]),
+        ]));
+      });
+    }
+
+    function currentSelection() {
+      return Array.from(document.querySelectorAll("#gamesBox input:checked")).map((c) => c.value);
+    }
+
+    function resetForm() {
+      editingId = null;
+      $("studentName").value = "";
+      $("formTitle").textContent = "إضافة طالب";
+      $("saveBtn").textContent = "حفظ";
+      $("cancelBtn").classList.add("hidden");
+      $("formErr").textContent = "";
+      $("formOk").textContent = "";
+      $("saveBtn").disabled = mosqueLocked;
+      renderGamesBox([]);
+    }
+    $("cancelBtn").addEventListener("click", resetForm);
+
+    function startEdit(s) {
+      editingId = s.id;
+      $("studentName").value = s.name || "";
+      $("formTitle").textContent = "تعديل: " + (s.name || "");
+      $("saveBtn").textContent = "حفظ التعديل";
+      $("cancelBtn").classList.remove("hidden");
+      $("formErr").textContent = "";
+      $("formOk").textContent = "";
+      renderGamesBox(s.games || []);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    $("saveBtn").addEventListener("click", async () => {
+      const btn = $("saveBtn");
+      $("formErr").textContent = "";
+      $("formOk").textContent = "";
+
+      if (mosqueLocked) return ($("formErr").textContent = "المسجد مقفول");
+      const name = $("studentName").value.trim();
+      if (name.length < 2 || name.length > 60) return ($("formErr").textContent = "اسم الطالب لازم يكون بين 2 و60 حرف");
+
+      const selected = currentSelection();
+      if (selected.length > maxGames) {
+        return ($("formErr").textContent = "الحد الأقصى للألعاب لكل طالب " + maxGames + "، اختر أقل");
+      }
+      for (const gid of selected) {
+        const g = games.find((x) => x.id === gid) || {};
+        if (countFor(gid, editingId) >= (g.maxPlayers ?? 0)) {
+          return ($("formErr").textContent = "لعبة (" + (g.name || gid) + ") مكتملة");
+        }
+      }
+
+      btn.disabled = true;
+      try {
+        if (editingId) {
+          await updateDoc(doc(db, "players", editingId), { name, games: selected, updatedAt: serverTimestamp() });
+          $("formOk").textContent = "تم حفظ التعديل";
+        } else {
+          await addDoc(collection(db, "players"), {
+            name, games: selected, mosqueId, isTest: false,
+            createdAt: serverTimestamp(), createdBy: me.uid,
+          });
+          $("formOk").textContent = "تم تسجيل الطالب";
+        }
+        resetForm();
+        $("formOk").textContent = editingId ? "" : $("formOk").textContent;
+        await loadStudents();
+      } catch (e) {
+        $("formErr").textContent = errText(e);
+      } finally {
+        btn.disabled = mosqueLocked;
+      }
+    });
+
+    async function removeStudent(s) {
+      if (mosqueLocked) return;
+      if (!confirm("حذف الطالب (" + (s.name || "") + ")؟")) return;
+      try {
+        await deleteDoc(doc(db, "players", s.id));
+        await loadStudents();
+      } catch (e) {
+        alert(errText(e));
+      }
+    }
+  </script>
+</body>
+</html>
