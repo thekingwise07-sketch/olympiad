@@ -20,7 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set version
-        run: printf '{"v": "%s"}\n' "$GITHUB_SHA" > version.json
+        run: |
+          echo "{\"v\": \"$GITHUB_SHA\"}" > version.json
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
