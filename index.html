@@ -106,7 +106,7 @@
 
     // جلسة محفوظة من قبل
     onAuthStateChanged(auth, (user) => {
-      if (user) routeUser(user).catch(() => { $("loginErr").textContent = "ما قدرنا نتحقق من الحساب، حاول مرة ثانية"; });
+      if (user) routeUser(user).catch((e) => { $("loginErr").textContent = "ما قدرنا نتحقق من الحساب: " + (e.code || e.message); });
     });
 
     $("loginForm").addEventListener("submit", async (ev) => {
