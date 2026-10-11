@@ -38,6 +38,7 @@
     </section>
     <a class="tile hidden" id="adminLink" href="accounts.html">إدارة الحسابات</a>
     <a class="tile hidden" id="mosquesLink" href="mosques.html">إدارة المساجد</a>
+    <a class="tile hidden" id="gamesLink" href="games.html">إدارة الألعاب</a>
   </main>
 
   <script type="module">
@@ -60,7 +61,7 @@
 
       $("name").textContent = p.name || "";
       $("role").textContent = ROLE_LABELS[p.role] || "";
-      if (p.role === "admin") { $("adminLink").classList.remove("hidden"); $("mosquesLink").classList.remove("hidden"); }
+      if (p.role === "admin") { $("adminLink").classList.remove("hidden"); $("mosquesLink").classList.remove("hidden"); $("gamesLink").classList.remove("hidden"); }
     });
 
     $("logoutBtn").addEventListener("click", async () => {
