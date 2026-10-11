@@ -7,7 +7,7 @@ import {
   createUserWithEmailAndPassword,
   signOut as fbSignOut,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ضع إعدادات مشروعك من Firebase Console > Project settings > Your apps
 export const firebaseConfig = {
@@ -31,7 +31,8 @@ export const ROLE_LABELS = {
 
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+// long polling: يحل مشكلة unavailable على الشبكات والمتصفحات اللي تحجب WebChannel
+export const db = initializeFirestore(app, { experimentalForceLongPolling: true });
 
 // الجلسة تفضل محفوظة: الآدمن يسجّل مرة وحدة
 await setPersistence(auth, browserLocalPersistence);
