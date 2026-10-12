@@ -14,6 +14,7 @@
   <div class="topbar"><div class="brand">إدارة المساجد</div><a class="btn ghost" href="app.html">الرئيسية</a></div>
 
   <main class="wrap">
+    <section class="hero" data-page-hero style="margin:14px 0 16px;padding:18px 20px;border-radius:22px"><span class="eyebrow" style="color:#f3dfb2">لوحة الإدارة</span><h1 style="margin:4px 0 0;font-size:22px;font-weight:900;color:#fffdf6">إدارة المساجد</h1></section>
     <section class="card">
       <h2>طلبات فتح التعديل</h2>
       <div id="requestsList"><p class="empty">جاري التحميل...</p></div>
@@ -63,7 +64,7 @@
       if (box) box.textContent = "خطأ: " + (e.reason && (e.reason.code || e.reason.message) || "غير معروف");
     });
   </script>
-  <nav class="tabbar">
+  <nav class="tabbar" aria-label="التنقل الإداري">
     <a href="app.html" class=""><span class="ic">🏠</span>الرئيسية</a>
     <a href="mosques.html" class="active"><span class="ic">🕌</span>المساجد</a>
     <a href="games.html" class=""><span class="ic">🎯</span>الألعاب</a>
