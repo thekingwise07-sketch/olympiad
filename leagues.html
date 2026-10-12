@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0A0F1E">
+  <title>دوري المجموعات</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="theme.css">
+  <script>(function(){document.documentElement.setAttribute("data-theme",localStorage.getItem("theme")||"dark");})();</script>
+  <style>
+    .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .tbl th, .tbl td { padding: 8px 4px; text-align: center; border-bottom: 1px solid var(--border); }
+    .tbl th { color: var(--muted); font-weight: 700; }
+    .tbl td.name { text-align: right; font-weight: 800; }
+    .qual td { background: rgba(22,163,74,.10); }
+    .grp { margin-bottom: 14px; }
+    .gtitle { font-weight: 900; color: var(--gold); margin-bottom: 6px; }
+    .pick { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+    .pick input { width: 18px; height: 18px; min-height: 0; }
+    .mrow { padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .mrow:last-child { border-bottom: 0; }
+  </style>
+</head>
+<body>
+  <div class="topbar"><div class="brand">دوري <span>المجموعات</span></div><a class="btn ghost" href="app.html">الرئيسية</a></div>
+
+  <main class="wrap">
+    <section class="card" id="listCard"><h2>الدوريات</h2><div id="list"><p class="empty">جاري التحميل...</p></div></section>
+
+    <section class="card hidden" id="viewCard"><div id="view"></div></section>
+
+    <section class="card hidden" id="adminCard">
+      <h2>إنشاء دوري (للآدمن)</h2>
+      <label for="lName">اسم الدوري</label>
+      <input id="lName" maxlength="60" placeholder="مثال: دوري المجموعات الرمضاني">
+      <label for="lGame">اللعبة</label>
+      <select id="lGame"></select>
+      <label for="lGroups">عدد المجموعات</label>
+      <select id="lGroups">
+        <option value="2">2</option><option value="4" selected>4</option><option value="8">8</option>
+      </select>
+      <label>وزّع الفرق على المجموعات</label>
+      <div id="assignBox"></div>
+      <p id="lMsg" class="msg"></p>
+      <button id="createLeagueBtn" type="button">إنشاء الدوري</button>
+    </section>
+  </main>
+
+  <nav class="tabbar" aria-label="التنقل الرئيسي">
+    <a href="app.html" class=""><span class="ic">🏠</span>الرئيسية</a>
+    <a href="matches-public.html" class=""><span class="ic">⚽</span>المباريات</a>
+    <a href="ranking.html" class=""><span class="ic">🏆</span>الترتيب</a>
+    <a href="mosques-public.html" class=""><span class="ic">🕌</span>المساجد</a>
+    <a href="news.html" class=""><span class="ic">📰</span>الأخبار</a>
+  </nav>
+
+  <script type="module">
+    import { auth, db, tf, hasPerm } from "./firebase.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { collection, doc, getDoc, getDocs, addDoc, updateDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+    const esc = (t) => { const d = document.createElement("div"); d.textContent = t ?? ""; return d.innerHTML; };
+    const GL = ["أ", "ب", "ج", "د", "هـ", "و", "ز", "ح"];
+    let me = null, mosques = {}, teams = {}, games = {}, points = {};
+    let assign = {};   // teamId -> group index
+
+    onAuthStateChanged(auth, async (user) => {
+      me = null;
+      if (user) {
+        const s = await getDoc(doc(db, "users", user.uid));
+        const p = s.exists() ? s.data() : null;
+        if (p && !p.disabled && !p.deleted && p.role === "admin") me = { uid: user.uid, ...p };
+      }
+      $("adminCard").classList.toggle("hidden", !me);
+      await loadBase();
+      await loadList();
+    });
+
+    async function loadBase() {
+      const [m, t, g, s] = await Promise.all([
+        getDocs(query(collection(db, "mosques"), ...tf())),
+        getDocs(query(collection(db, "teams"), ...tf())),
+        getDocs(query(collection(db, "games"), ...tf())),
+        getDoc(doc(db, "settings", "points")),
+      ]);
+      mosques = Object.fromEntries(m.docs.map((d) => [d.id, d.data()]));
+      teams = Object.fromEntries(t.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
+      games = Object.fromEntries(g.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
+      points = s.exists() ? s.data() : {};
+      if (me) {
+        $("lGame").innerHTML = Object.values(games).filter((x) => x.type !== "sprint" && !x.archived)
+          .map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("");
+        renderAssign();
+      }
+    }
+
+    function teamLabel(id) {
+      const t = teams[id] || {}; return ((mosques[t.mosqueId] || {}).name || "") + " · " + (t.name || "");
+    }
+
+    function renderAssign() {
+      const g = +$("lGroups").value;
+      const box = $("assignBox");
+      box.innerHTML = "";
+      Object.values(teams).sort((a, b) => teamLabel(a.id).localeCompare(teamLabel(b.id))).forEach((t) => {
+        const row = document.createElement("div");
+        row.className = "item";
+        row.style.display = "flex"; row.style.alignItems = "center"; row.style.gap = "8px";
+        const sel = document.createElement("select");
+        sel.style.maxWidth = "110px";
+        sel.innerHTML = `<option value="">—</option>` + Array.from({ length: g }, (_, i) => `<option value="${i}">${GL[i]}</option>`).join("");
+        sel.value = assign[t.id] ?? "";
+        sel.onchange = () => { if (sel.value === "") delete assign[t.id]; else assign[t.id] = +sel.value; };
+        row.innerHTML = `<span style="flex:1;font-size:14px">${esc(teamLabel(t.id))}</span>`;
+        row.appendChild(sel);
+        box.appendChild(row);
+      });
+    }
+    $("lGroups").addEventListener("change", () => { for (const k of Object.keys(assign)) if (assign[k] >= +$("lGroups").value) delete assign[k]; renderAssign(); });
+
+    // ---------- قائمة الدوريات ----------
+    async function loadList() {
+      const snap = await getDocs(query(collection(db, "tournaments"), ...tf()));
+      const list = $("list");
+      list.innerHTML = "";
+      if (snap.empty) { list.innerHTML = '<p class="empty">ما في دوريات بعد</p>'; return; }
+      snap.docs.map((d) => ({ id: d.id, ...d.data() })).forEach((t) => {
+        const row = document.createElement("div");
+        row.className = "item"; row.style.cursor = "pointer";
+        row.innerHTML = `<div class="item-name">${esc(t.name)}</div><div class="item-meta">${esc((games[t.gameId] || {}).name || "")} · ${t.groups.length} مجموعات</div>`;
+        row.onclick = () => openLeague(t);
+        list.appendChild(row);
+      });
+    }
+
+    // ---------- الترتيب من المباريات النهائية ----------
+    function standings(t, matches) {
+      const cfg = points[(games[t.gameId] || {}).type] || { win: 3, draw: 1, loss: 0 };
+      const out = {};
+      t.groups.forEach((g, gi) => {
+        const table = {};
+        g.teamIds.forEach((id) => { table[id] = { id, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 }; });
+        matches.filter((m) => m.groupIndex === gi && m.status === "final").forEach((m) => {
+          const a = table[m.teamAId], b = table[m.teamBId];
+          if (!a || !b) return;
+          a.p++; b.p++; a.gf += m.scoreA || 0; a.ga += m.scoreB || 0; b.gf += m.scoreB || 0; b.ga += m.scoreA || 0;
+          if (m.scoreA > m.scoreB) { a.w++; b.l++; a.pts += cfg.win ?? 3; b.pts += cfg.loss ?? 0; }
+          else if (m.scoreA < m.scoreB) { b.w++; a.l++; b.pts += cfg.win ?? 3; a.pts += cfg.loss ?? 0; }
+          else { a.d++; b.d++; a.pts += cfg.draw ?? 1; b.pts += cfg.draw ?? 1; }
+        });
+        out[gi] = Object.values(table).sort((x, y) => y.pts - x.pts || y.w - x.w || (y.gf - y.ga) - (x.gf - x.ga) || y.gf - x.gf);
+      });
+      return out;
+    }
+
+    // ---------- عرض الدوري ----------
+    async function openLeague(t) {
+      const mSnap = await getDocs(query(collection(db, "matches"), where("tournamentId", "==", t.id), ...tf()));
+      const matches = mSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const st = standings(t, matches);
+      const view = $("view");
+      view.innerHTML = `<h2>${esc(t.name)}</h2><div class="item-meta">${esc((games[t.gameId] || {}).name || "")}</div><div id="groups" style="margin-top:12px"></div><div id="gm" style="margin-top:14px"></div>`;
+
+      const gBox = $("groups");
+      const qualifyN = t.qualifyCount || 2;
+      t.groups.forEach((g, gi) => {
+        const rows = st[gi].map((r, i) => `<tr class="${i < qualifyN ? "qual" : ""}">
+          <td class="name">${esc((mosques[(teams[r.id] || {}).mosqueId] || {}).name || "")} · ${esc((teams[r.id] || {}).name || "")}</td>
+          <td>${r.p}</td><td>${r.w}</td><td>${r.d}</td><td>${r.l}</td><td>${r.gf}-${r.ga}</td><td><b class="gold">${r.pts}</b></td></tr>`).join("");
+        const picks = me && t.status !== "knockout" ? st[gi].map((r, i) => `<label class="pick"><input type="checkbox" data-q="${r.id}" ${i < qualifyN ? "checked" : ""}>${esc((teams[r.id] || {}).name || "")}</label>`).join("") : "";
+        gBox.appendChild(el2("div", "card grp", `<div class="gtitle">المجموعة ${GL[gi]}</div>
+          <table class="tbl"><tr><th style="text-align:right">الفريق</th><th>لعب</th><th>فوز</th><th>تعادل</th><th>خسارة</th><th>أهداف</th><th>نقاط</th></tr>${rows}</table>${picks ? `<div style="margin-top:8px">${picks}</div>` : ""}`));
+      });
+
+      const gm = $("gm");
+      gm.appendChild(el2("div", "gtitle", "مباريات المجموعات"));
+      if (!matches.length) gm.appendChild(el2("p", "empty", "ما توّلدت المباريات بعد"));
+      matches.sort((a, b) => (a.groupIndex - b.groupIndex) || (a.matchDate || "").localeCompare(b.matchDate || "")).forEach((m) => {
+        gm.appendChild(el2("div", "mrow", `<div class="meta">المجموعة ${GL[m.groupIndex]} · ${esc(m.matchDate || "")} ${esc(m.matchTime || "")}</div>
+          <div style="font-weight:800">${esc(teamLabel(m.teamAId))} ضد ${esc(teamLabel(m.teamBId))}</div>
+          <div class="score" style="font-size:20px">${m.status === "final" ? (m.scoreA ?? 0) + " - " + (m.scoreB ?? 0) : "لم تنتهِ"}</div>`));
+      });
+
+      if (me) {
+        const admin = el2("div", "card", `<div class="gtitle">أدوات الآدمن</div>`);
+        const gen = document.createElement("button"); gen.textContent = "توليد مباريات المجموعات"; gen.className = "ghost";
+        gen.onclick = () => generateGroupMatches(t, matches);
+        const ko = document.createElement("button"); ko.textContent = "اعتماد المتأهلين وإنشاء الإقصائي";
+        ko.onclick = () => createKnockout(t, st, qualifyN);
+        admin.append(gen, ko);
+        view.appendChild(admin);
+      }
+
+      $("listCard").classList.add("hidden");
+      $("viewCard").classList.remove("hidden");
+    }
+
+    function el2(tag, cls, html) {
+      const d = document.createElement(tag === "div" ? "div" : tag);
+      if (cls && cls.startsWith("gtitle")) d.className = cls; else d.className = cls || "";
+      if (html && html.startsWith("<")) d.innerHTML = html; else d.textContent = html || "";
+      return d;
+    }
+
+    // ---------- توليد مباريات المجموعات (مرة وحدة) ----------
+    async function generateGroupMatches(t, existing) {
+      const have = new Set(existing.map((m) => m.groupIndex + ":" + [m.teamAId, m.teamBId].sort().join("|")));
+      let n = 0;
+      for (let gi = 0; gi < t.groups.length; gi++) {
+        const ids = t.groups[gi].teamIds;
+        for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+          const key = gi + ":" + [ids[i], ids[j]].sort().join("|");
+          if (have.has(key)) continue;
+          const ta = teams[ids[i]] || {}, tb = teams[ids[j]] || {};
+          await addDoc(collection(db, "matches"), {
+            gameId: t.gameId, mosqueA: ta.mosqueId || "", mosqueB: tb.mosqueId || "",
+            teamAId: ids[i], teamBId: ids[j], scoreA: 0, scoreB: 0, status: "draft",
+            organizerUid: me.uid, tournamentId: t.id, groupIndex: gi, stage: "group", isTest: false,
+            createdAt: serverTimestamp(),
+          });
+          n++;
+        }
+      }
+      alert(n ? "تم توليد " + n + " مباراة" : "كل المباريات موجودة من قبل");
+      await openLeague(t);
+    }
+
+    // ---------- الإقصائي من المتأهلين ----------
+    async function createKnockout(t, st, qualifyN) {
+      const picked = {};
+      document.querySelectorAll("#groups input[data-q]").forEach((c) => { if (c.checked) picked[c.dataset.q] = true; });
+      const seeds = [];
+      const G = t.groups.length;
+      // ترتيب المتأهلين حسب الترتيب داخل كل مجموعة
+      const ranked = t.groups.map((_, gi) => st[gi].filter((r) => picked[r.id]).map((r) => r.id));
+      if (ranked.some((r) => r.length !== qualifyN)) return alert("لازم تختار " + qualifyN + " متأهلين بكل مجموعة");
+      const total = G * qualifyN;
+      if (total < 2 || (total & (total - 1)) !== 0) return alert("عدد المتأهلين لازم يكون 2 أو 4 أو 8 أو 16");
+      // توزيع متصالب: (أ1 ضد ب2)، (ب1 ضد أ2)...
+      if (qualifyN === 1) { ranked.forEach((r) => seeds.push(r[0])); }
+      else {
+        for (let g = 0; g < G; g += 2) {
+          const A = ranked[g], B = ranked[g + 1] || [];
+          seeds.push(A[0], B[1] || B[0], B[0], A[1] || A[0]);
+          if (!B.length) break;
+        }
+      }
+      if (seeds.length !== total) return alert("تعذّر ترتيب المتأهلين، راجع المجموعات");
+      if (!confirm("إنشاء الإقصائي بهالترتيب؟ بعدها تقدر تعدّل من صفحة الجداول.")) return;
+      const bRef = await addDoc(collection(db, "brackets"), {
+        name: t.name + " - الإقصائي", gameId: t.gameId, size: total, thirdPlace: false,
+        teamIds: seeds, tournamentId: t.id, isTest: false, createdAt: serverTimestamp(), createdBy: me.uid,
+      });
+      for (let i = 0; i < total / 2; i++) {
+        const ta = teams[seeds[2 * i]] || {}, tb = teams[seeds[2 * i + 1]] || {};
+        await addDoc(collection(db, "matches"), {
+          gameId: t.gameId, mosqueA: ta.mosqueId || "", mosqueB: tb.mosqueId || "",
+          teamAId: seeds[2 * i], teamBId: seeds[2 * i + 1], scoreA: 0, scoreB: 0, status: "draft",
+          organizerUid: me.uid, bracketId: bRef.id, round: 0, slot: i, isTest: false, createdAt: serverTimestamp(),
+        });
+      }
+      await updateDoc(doc(db, "tournaments", t.id), { status: "knockout", bracketId: bRef.id });
+      alert("تم إنشاء الإقصائي. افتحه من صفحة الجداول.");
+      location.href = "brackets.html";
+    }
+
+    // ---------- إنشاء الدوري ----------
+    $("createLeagueBtn").addEventListener("click", async () => {
+      const msg = $("lMsg");
+      msg.className = "msg";
+      const name = $("lName").value.trim();
+      const gameId = $("lGame").value;
+      const G = +$("lGroups").value;
+      if (name.length < 3) return (msg.textContent = "اكتب اسم الدوري");
+      if (!gameId) return (msg.textContent = "اختر اللعبة");
+      const groups = Array.from({ length: G }, () => ({ teamIds: [] }));
+      Object.entries(assign).forEach(([tid, gi]) => { if (gi < G) groups[gi].teamIds.push(tid); });
+      if (groups.some((g) => g.teamIds.length < 2)) return (msg.textContent = "كل مجموعة لازم فيها فريقين على الأقل");
+      const qualifyCount = +prompt("كم فريق يتأهل من كل مجموعة؟ (1 أو 2)", "2");
+      if (![1, 2].includes(qualifyCount)) return (msg.textContent = "التأهل لازم يكون 1 أو 2");
+      $("createLeagueBtn").disabled = true;
+      try {
+        await addDoc(collection(db, "tournaments"), {
+          name, gameId, groups, qualifyCount, status: "groups", isTest: false,
+          createdAt: serverTimestamp(), createdBy: me.uid,
+        });
+        msg.classList.add("ok"); msg.textContent = "تم إنشاء الدوري";
+        assign = {};
+        renderAssign();
+        await loadList();
+      } catch (e) {
+        msg.classList.add("err"); msg.textContent = (e?.code ? "[" + e.code + "] " : "") + (e?.message || "صار خطأ");
+      } finally {
+        $("createLeagueBtn").disabled = false;
+      }
+    });
+  </script>
+  <script type="module" src="maintenance.js"></script>
+</body>
+</html>
