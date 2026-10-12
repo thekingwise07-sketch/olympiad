@@ -241,3 +241,13 @@ button:disabled { opacity: .5; cursor: default; }
 .det { color: var(--muted); font-size: 12px; margin-top: 6px; direction: ltr; text-align: right; word-break: break-all; }
 .minus { }
 .swatch + .item-name { flex: 1; }
+
+/* ===== إصلاحات العرض: منع التمرير الجانبي وتوزيع الأزرار ===== */
+html, body { max-width: 100%; overflow-x: hidden; }
+img, input, select, textarea, canvas { max-width: 100%; }
+.row { flex-wrap: wrap; }
+.row > button, .row > a { flex: 1 1 140px; min-width: 0; text-align: center; }
+.item-actions > button, .item-actions > a { flex: 1 1 130px; min-width: 0; }
+.user-head > * { min-width: 0; }
+.wrap, main { min-width: 0; }
+.card, .user, .item, .hero { min-width: 0; overflow-wrap: anywhere; }

@@ -5,31 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#1E3A8A">
   <title>أولمبياد المساجد - تسجيل الدخول</title>
+  <link rel="stylesheet" href="theme.css">
+  <script>(function(){document.documentElement.setAttribute("data-theme",localStorage.getItem("theme")||"dark");})();</script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
-  <style>
-    :root { --blue:#1E3A8A; --gold:#D4A937; --bg:#F8FAFC; --radius:14px; }
-    * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; font-family: Tajawal, system-ui, sans-serif; background: var(--bg); color: #0F172A; }
-    header { background: var(--blue); color: #fff; text-align: center; padding: calc(28px + env(safe-area-inset-top, 0px)) 20px 28px; }
-    header h1 { margin: 0; font-size: 24px; font-weight: 900; }
-    header span { color: var(--gold); font-weight: 700; }
-    main { flex: 1; display: flex; justify-content: center; padding: 24px 16px; }
-    .card { width: 100%; max-width: 400px; background: #fff; border-radius: var(--radius); padding: 24px; box-shadow: 0 4px 16px rgba(30,58,138,.08); }
-    h2 { margin: 0 0 8px; font-size: 20px; color: var(--blue); }
-    p.hint { margin: 0 0 8px; color: #475569; font-size: 15px; line-height: 1.6; }
-    label { display: block; margin: 14px 0 6px; font-weight: 700; color: var(--blue); }
-    input { width: 100%; min-height: 48px; padding: 10px 14px; font: inherit; font-size: 17px; border: 1.5px solid #CBD5E1; border-radius: 12px; background: #fff; direction: ltr; text-align: right; }
-    input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,169,55,.25); }
-    button { width: 100%; min-height: 48px; margin-top: 20px; font: inherit; font-size: 17px; font-weight: 700; background: var(--blue); color: #fff; border: 0; border-radius: 12px; cursor: pointer; }
-    button:disabled { opacity: .6; cursor: default; }
-    .err { color: #B91C1C; min-height: 22px; margin: 12px 0 0; font-size: 15px; line-height: 1.5; }
-    .hidden { display: none !important; }
-  </style>
 </head>
 <body>
-  <header><h1>أولمبياد <span>المساجد</span></h1></header>
+  <div class="hero" style="text-align:center"><h1>أولمبياد <span class="gold">المساجد</span></h1><p>تسجيل الدخول لأصحاب الحسابات</p></div>
 
-  <main>
+  <main class="wrap" style="max-width:440px;margin:0 auto;padding-top:20px">
     <section class="card" id="loginStep">
       <h2>تسجيل الدخول</h2>
       <p class="hint">ادخل باليوزر وكلمة السر اللي عطاك إياها الآدمن.</p>
@@ -41,7 +24,7 @@
         <button id="loginBtn" type="submit">دخول</button>
         <p id="loginErr" class="err" role="alert"></p>
       </form>
-      <p style="text-align:center;margin:16px 0 0"><a href="home.html" style="color:#1E3A8A;font-weight:700;text-decoration:none">الدخول كزائر ←</a></p>
+      <p style="text-align:center;margin:16px 0 0"><a href="app.html" style="color:#1E3A8A;font-weight:700;text-decoration:none">الدخول كزائر ←</a></p>
     </section>
 
     <section class="card hidden" id="changeStep">
