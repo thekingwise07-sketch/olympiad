@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#0b1715">
   <title>أولمبياد المساجد | الرئيسية</title>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="icon" href="logo-192.png">
   <script>(function(){document.documentElement.setAttribute("data-theme",localStorage.getItem("theme")||"dark");})();</script>
   <style>
     :root { color-scheme: light; --bg:#f3f5ef; --surface:#fff; --surface-2:#f0f3ec; --surface-3:#e5ebe1; --text:#192c26; --muted:#718078; --border:rgba(35,68,53,.12); --primary:#246b4b; --accent:#d8b56b; --accent-2:#f1dba8; --hero-start:#163f30; --hero-end:#246b4b; --nav-bg:rgba(255,255,255,.92); --gold-text:#a97b2b; --success:#2f9e6e; --shadow:0 10px 32px rgba(27,56,40,.08); --shadow-lg:0 24px 60px rgba(0,0,0,.16); --radius:18px; }
@@ -84,7 +85,7 @@
 <body>
   <header class="topbar">
     <div class="shell topbar-inner">
-      <a class="brand" href="app.html"><span class="mark">م</span><span>أولمبياد <span>المساجد</span></span></a>
+      <a class="brand" href="app.html"><img src="logo-192.png" alt="أولمبياد المساجد" style="width:42px;height:42px;border-radius:12px;object-fit:contain;background:#fff"><span>أولمبياد <span>المساجد</span></span></a>
       <div class="actions">
         <button class="icon-btn" id="theme-toggle" type="button" aria-label="تبديل المظهر">🌓</button>
         <a class="acc-btn" id="auth-link" href="index.html">حسابي</a>
@@ -278,5 +279,6 @@
     load().catch(() => { $("today-matches").innerHTML = `<p class="empty">ما قدرنا نحمّل البيانات الحين</p>`; });
   </script>
   <script type="module" src="maintenance.js"></script>
+  <script>(function(){var p=new URLSearchParams(location.search).get("preview");if(!p)return;var d=document.createElement("div");d.setAttribute("style","position:sticky;top:0;z-index:99;background:#e2bd75;color:#0b1715;padding:8px 12px;font-weight:700;text-align:center;font-family:Tajawal,system-ui,sans-serif");d.textContent="أنت تعاين كـ: "+({visitor:"زائر"}[p]||p)+" · الآدمن عنده كل الصلاحيات حتى بالمعاينة";document.body.prepend(d);})();</script>
 </body>
 </html>

@@ -153,7 +153,7 @@
 
     $("previewBtn").addEventListener("click", () => {
       const r = $("previewRole").value;
-      const page = r === "visitor" ? "home.html" : r === "supervisor" ? "students.html" : "matches.html";
+      const page = r === "visitor" ? "app.html" : r === "supervisor" ? "students.html" : "matches.html";
       window.open(page + "?preview=" + r, "_blank", "noopener");
     });
 
