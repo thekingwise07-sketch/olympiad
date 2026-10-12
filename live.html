@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1715">
+  <title>المباراة المباشرة</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="icon" href="logo-192.png">
+  <script>(function(){document.documentElement.setAttribute("data-theme",localStorage.getItem("theme")||"dark");})();</script>
+  <style>
+    .sel { width: 100%; min-height: 48px; padding: 10px 14px; font: inherit; font-size: 15px; color: var(--text); background: var(--surface-2); border: 1.5px solid var(--border); border-radius: 14px; margin-top: 6px; }
+    .live-score { display: flex; align-items: center; justify-content: center; gap: 14px; font-size: 44px; font-weight: 900; color: var(--gold); direction: ltr; margin: 10px 0; }
+    .live-score span.sep { font-size: 24px; color: var(--muted); }
+    .pulse { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 9px; background: rgba(77,214,154,.12); color: var(--success); font-weight: 800; font-size: 12px; }
+    .pulse::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--success); animation: p 1.4s infinite; }
+    @keyframes p { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+    .evt { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .evt:last-child { border-bottom: 0; }
+    .evt .t { color: var(--muted); font-size: 12px; direction: ltr; min-width: 52px; }
+    .mrow { padding: 12px; border: 1px solid var(--border); border-radius: 14px; margin-bottom: 8px; cursor: pointer; background: var(--surface-2); }
+    .mrow.on { border-color: var(--gold); }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .danger-btn { background: var(--danger); }
+  </style>
+</head>
+<body>
+  <div class="topbar"><div class="brand">المباراة <span>المباشرة</span></div><a class="btn ghost" href="app.html">الرئيسية</a></div>
+
+  <main class="wrap">
+    <section class="hero" data-page-hero style="margin:14px 0 16px;padding:18px 20px;border-radius:22px">
+      <span class="eyebrow" style="color:#f3dfb2">لوحة المنظم</span>
+      <h1 style="margin:4px 0 0;font-size:22px;font-weight:900;color:#fffdf6">سجّل المباراة لحظة بلحظة</h1>
+    </section>
+
+    <section class="card">
+      <h2>مبارياتي</h2>
+      <div id="mlist"><p class="empty">جاري التحميل...</p></div>
+    </section>
+
+    <section class="card hidden" id="ctrl">
+      <div id="head"></div>
+      <div class="live-score" id="score">0 <span class="sep">:</span> 0</div>
+      <div style="text-align:center" id="state"></div>
+
+      <div class="grid2" style="margin-top:14px">
+        <div><label for="pl">اللاعب</label><select class="sel" id="pl"></select></div>
+        <div><label for="ty">الحدث</label>
+          <select class="sel" id="ty">
+            <option value="goal">⚽ هدف</option>
+            <option value="yellow">🟨 بطاقة صفراء</option>
+            <option value="red">🟥 بطاقة حمراء</option>
+            <option value="foul">⚠️ فاول</option>
+          </select>
+        </div>
+      </div>
+      <button id="addBtn" type="button" style="width:100%">تسجيل الحدث</button>
+      <p id="msg" class="msg"></p>
+
+      <h2 style="margin-top:18px">سجل الأحداث</h2>
+      <div id="events"><p class="empty">ما في أحداث بعد</p></div>
+
+      <hr class="hr">
+      <button id="endBtn" type="button" class="danger-btn" style="width:100%">إنهاء المباراة</button>
+    </section>
+  </main>
+
+  <nav class="tabbar">
+    <a href="app.html"><span class="ic">🏠</span>الرئيسية</a>
+    <a href="matches-public.html"><span class="ic">⚽</span>المباريات</a>
+    <a href="live.html" class="active"><span class="ic">🔴</span>المباشر</a>
+    <a href="ranking.html"><span class="ic">🏆</span>الترتيب</a>
+    <a href="news.html"><span class="ic">📰</span>الأخبار</a>
+  </nav>
+
+  <script type="module">
+    import { auth, db, tf } from "./firebase.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { collection, doc, getDoc, getDocs, updateDoc, query, where, arrayUnion, increment, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { watchMatches, EVENT_LABELS, EVENT_ICONS, toast } from "./live.js";
+
+    const $ = (id) => document.getElementById(id);
+    const esc = (t) => { const d = document.createElement("div"); d.textContent = t ?? ""; return d.innerHTML; };
+    const FIELD = { goal: "goals", yellow: "yellow", red: "red", foul: "fouls" };
+    let me = null, mosques = {}, games = {}, matches = [], selected = null, players = [];
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return location.replace("index.html");
+      const s = await getDoc(doc(db, "users", user.uid));
+      const p = s.exists() ? s.data() : null;
+      if (!p || p.disabled || p.deleted || !["organizer", "admin"].includes(p.role)) return location.replace("app.html");
+      me = { uid: user.uid, ...p };
+      const [mSnap, gSnap] = await Promise.all([getDocs(query(collection(db, "mosques"), ...tf())), getDocs(query(collection(db, "games"), ...tf()))]);
+      mosques = Object.fromEntries(mSnap.docs.map((d) => [d.id, d.data()]));
+      games = Object.fromEntries(gSnap.docs.map((d) => [d.id, d.data()]));
+      watchMatches((list) => { matches = list; renderList(); if (selected) renderSelected(); });
+    });
+
+    const mName = (id) => (mosques[id] || {}).name || "-";
+
+    function editable(m) {
+      if (!me) return false;
+      if (m.status === "final") return false;
+      return me.role === "admin" || m.organizerUid === me.uid;
+    }
+
+    function renderList() {
+      const box = $("mlist");
+      const mine = matches.filter(editable).sort((a, b) => (a.matchDate || "").localeCompare(b.matchDate || ""));
+      box.innerHTML = "";
+      if (!mine.length) { box.innerHTML = '<p class="empty">ما في مباريات قابلة للتسجيل</p>'; return; }
+      mine.forEach((m) => {
+        const row = document.createElement("div");
+        row.className = "mrow" + (selected && selected.id === m.id ? " on" : "");
+        const live = m.live ? '<span class="pulse">مباشرة</span>' : "";
+        row.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font-weight:800">${esc(mName(m.mosqueA))} ضد ${esc(mName(m.mosqueB))}</span>${live}</div>
+          <div class="muted" style="font-size:12px;margin-top:4px">${esc((games[m.gameId] || {}).name || "")} · ${esc(m.matchDate || "")} ${esc(m.matchTime || "")}</div>`;
+        row.onclick = () => select(m);
+        box.appendChild(row);
+      });
+    }
+
+    async function select(m) {
+      selected = m;
+      $("ctrl").classList.remove("hidden");
+      await loadPlayers(m);
+      if (!m.live) await updateDoc(doc(db, "matches", m.id), { live: true, updatedAt: serverTimestamp() });
+      renderList();
+      renderSelected();
+      $("ctrl").scrollIntoView({ behavior: "smooth" });
+    }
+
+    async function loadPlayers(m) {
+      const load = async (mid) => {
+        const snap = await getDocs(query(collection(db, "players"), where("mosqueId", "==", mid), ...tf()));
+        return snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => (p.games || []).includes(m.gameId))
+          .map((p) => ({ ...p, mosqueId: mid, teamName: mName(mid) }));
+      };
+      players = [...(await load(m.mosqueA)), ...(await load(m.mosqueB))];
+      $("pl").innerHTML = players.map((p) => `<option value="${esc(p.id)}">${esc(p.name)} · ${esc(p.teamName)}</option>`).join("")
+        || '<option value="">لا يوجد لاعبين مسجلين باللعبة</option>';
+    }
+
+    function renderSelected() {
+      const m = matches.find((x) => x.id === selected.id) || selected;
+      selected = m;
+      $("head").innerHTML = `<div style="text-align:center;font-weight:900;font-size:18px">${esc(mName(m.mosqueA))} ضد ${esc(mName(m.mosqueB))}</div>
+        <div class="muted" style="text-align:center;font-size:12px">${esc((games[m.gameId] || {}).name || "")}</div>`;
+      $("score").innerHTML = `${m.scoreA ?? 0} <span class="sep">:</span> ${m.scoreB ?? 0}`;
+      $("state").innerHTML = m.live ? '<span class="pulse">مباشرة الآن</span>' : '<span class="muted">لم تبدأ</span>';
+      const evs = (m.details?.events || []).slice().reverse();
+      $("events").innerHTML = evs.length ? evs.map((e) => {
+        const t = new Date(e.at);
+        return `<div class="evt"><span class="t">${t.toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" })}</span>
+          <span>${EVENT_ICONS[e.type] || ""} ${esc(EVENT_LABELS[e.type] || "")}</span>
+          <span style="font-weight:800">${esc(e.playerName || "")}</span><span class="muted" style="margin-inline-start:auto">${esc(e.teamName || "")}</span></div>`;
+      }).join("") : '<p class="empty">ما في أحداث بعد</p>';
+    }
+
+    $("addBtn").addEventListener("click", async () => {
+      $("msg").textContent = "";
+      const pid = $("pl").value;
+      const type = $("ty").value;
+      if (!selected || !pid) return ($("msg").textContent = "اختر اللاعب");
+      const p = players.find((x) => x.id === pid);
+      if (!p) return;
+      const btn = $("addBtn");
+      btn.disabled = true;
+      try {
+        const ev = { type, playerId: pid, playerName: p.name, teamName: p.teamName, mosqueId: p.mosqueId, at: new Date().toISOString() };
+        const updates = {
+          "details.events": arrayUnion(ev),
+          [`details.players.${pid}.${FIELD[type]}`]: increment(1),
+          live: true,
+          updatedAt: serverTimestamp(),
+        };
+        if (type === "goal") {
+          if (p.mosqueId === selected.mosqueA) updates.scoreA = increment(1);
+          else updates.scoreB = increment(1);
+        }
+        await updateDoc(doc(db, "matches", selected.id), updates);
+        $("msg").className = "msg ok";
+        $("msg").textContent = "تم تسجيل: " + EVENT_LABELS[type] + " · " + p.name;
+      } catch (e) {
+        $("msg").className = "msg err";
+        $("msg").textContent = (e?.code ? "[" + e.code + "] " : "") + (e?.message || "صار خطأ");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    $("endBtn").addEventListener("click", async () => {
+      if (!selected) return;
+      if (!confirm("إنهاء المباراة؟ بعدها تنقفل النتيجة، ولا يعدّلها إلا الآدمن.")) return;
+      if (!confirm("متأكد؟ هذا الإجراء نهائي للمنظم.")) return;
+      try {
+        await updateDoc(doc(db, "matches", selected.id), { status: "final", live: false, endedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        toast("🏁 انتهت المباراة وتم اعتماد النتيجة");
+        selected = null;
+        $("ctrl").classList.add("hidden");
+        renderList();
+      } catch (e) {
+        $("msg").className = "msg err";
+        $("msg").textContent = (e?.code ? "[" + e.code + "] " : "") + (e?.message || "صار خطأ");
+      }
+    });
+  </script>
+  <script type="module" src="maintenance.js"></script>
+</body>
+</html>

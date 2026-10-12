@@ -49,6 +49,8 @@
     .versus { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; margin-top: 14px; text-align: center; }
     .team { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; font-size: 13px; font-weight: 800; }
     .badge { width: 46px; height: 46px; border-radius: 15px; display: grid; place-items: center; background: color-mix(in srgb, var(--c) 16%, var(--surface)); color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); font-weight: 900; overflow: hidden; }
+    .pulse-dot { width:8px;height:8px;border-radius:50%;background:var(--success);display:inline-block;margin-inline-end:6px;animation:pd 1.4s infinite; }
+    @keyframes pd { 0%,100%{opacity:1} 50%{opacity:.3} }
     .badge img { width: 100%; height: 100%; object-fit: cover; }
     .score { font-size: 26px; font-weight: 900; color: var(--gold-text); direction: ltr; }
     .score.pending { font-size: 12px; color: var(--muted); }
@@ -103,6 +105,7 @@
 
     <section class="section">
       <div class="head"><div><div class="eyebrow">من قلب المنافسة</div><h2>مباريات اليوم</h2></div><a class="more" href="matches-public.html">الكل ←</a></div>
+      <div id="live-box"></div>
       <div class="grid cols" id="today-matches"><p class="empty">جاري التحميل...</p></div>
     </section>
 
@@ -151,7 +154,7 @@
     const ROLE_LINKS = {
       visitor: [["📰", "الأخبار", "news.html"], ["📜", "القوانين", "rules.html"], ["🧩", "الجداول", "brackets.html"], ["🗂️", "الدوري", "leagues.html"]],
       mosque_supervisor: [["👥", "طلابي", "students.html"], ["🧩", "الجداول", "brackets.html"], ["📜", "القوانين", "rules.html"]],
-      organizer: [["✍️", "مبارياتي", "matches.html"], ["🧩", "الجداول", "brackets.html"], ["📜", "القوانين", "rules.html"]],
+      organizer: [["🔴", "المباشر", "live.html"], ["✍️", "مبارياتي", "matches.html"], ["🧩", "الجداول", "brackets.html"], ["📜", "القوانين", "rules.html"]],
       supervisor: [["📰", "الأخبار", "news.html"], ["🧾", "السجل", "log.html"], ["👥", "الطلاب", "students.html"]],
       admin: [["🛠️", "الأدوات", "tools.html"], ["👤", "الحسابات", "accounts.html"], ["🕌", "المساجد", "mosques.html"], ["🎯", "الألعاب", "games.html"], ["🧾", "السجل", "log.html"], ["🧩", "الجداول", "brackets.html"]],
     };
@@ -205,6 +208,14 @@
       const today = todayStr();
 
       // مباريات اليوم، وإذا ما في نعرض آخر النتائج
+      const liveNow = all.filter((m) => m.live && m.status !== "final");
+      $("live-box").innerHTML = liveNow.length ? liveNow.map((m) => {
+        const mA = mosques[m.mosqueA] || {}, mB = mosques[m.mosqueB] || {};
+        return `<div class="card" style="margin-bottom:12px;border-color:var(--gold)">
+          <div class="meta"><span class="pulse-dot"></span><span style="color:var(--success);font-weight:900">🔴 مباشرة الآن</span><span>${esc((games[m.gameId] || {}).name || "")}</span></div>
+          <div class="versus"><div class="team">${badge(mA)}<span>${esc(mA.name || "-")}</span></div><span class="score">${m.scoreA ?? 0} : ${m.scoreB ?? 0}</span><div class="team">${badge(mB)}<span>${esc(mB.name || "-")}</span></div></div></div>`;
+      }).join("") : "";
+
       let list = all.filter((m) => m.matchDate === today).sort((a, b) => (a.matchTime || "").localeCompare(b.matchTime || ""));
       if (!list.length) list = all.filter((m) => m.status === "final").slice(0, 3);
       $("today-matches").innerHTML = list.length ? list.map(matchCard).join("") : `<p class="empty">ما في مباريات اليوم</p>`;
@@ -277,6 +288,7 @@
     $("sheet-bg").onclick = () => open(false);
 
     load().catch(() => { $("today-matches").innerHTML = `<p class="empty">ما قدرنا نحمّل البيانات الحين</p>`; });
+    import("./live.js").then(({ watchMatches }) => watchMatches(() => load().catch(() => {})));
   </script>
   <script type="module" src="maintenance.js"></script>
   <script>(function(){var p=new URLSearchParams(location.search).get("preview");if(!p)return;var d=document.createElement("div");d.setAttribute("style","position:sticky;top:0;z-index:99;background:#e2bd75;color:#0b1715;padding:8px 12px;font-weight:700;text-align:center;font-family:Tajawal,system-ui,sans-serif");d.textContent="أنت تعاين كـ: "+({visitor:"زائر"}[p]||p)+" · الآدمن عنده كل الصلاحيات حتى بالمعاينة";document.body.prepend(d);})();</script>

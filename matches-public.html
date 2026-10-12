@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#1E3A8A">
   <title>المباريات</title>
+  <link rel="icon" href="logo-192.png">
   <link rel="stylesheet" href="theme.css">
   <script>(function(){document.documentElement.setAttribute("data-theme",localStorage.getItem("theme")||"dark");})();</script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
@@ -37,7 +38,7 @@
         getDocs(query(collection(db, "games"), ...tf())),
         getDocs(query(collection(db, "mosques"), ...tf())),
         getDocs(query(collection(db, "players"), ...tf())),
-        getDocs(query(collection(db, "matches"), ...tf(), where("status", "==", "final"))),
+        getDocs(query(collection(db, "matches"), ...tf())),
       ]);
       const games = Object.fromEntries(gSnap.docs.map((d) => [d.id, d.data()]));
       const mosques = Object.fromEntries(mSnap.docs.map((d) => [d.id, d.data()]));
@@ -45,15 +46,17 @@
       const list = $("list");
       list.innerHTML = "";
 
-      const matches = mtSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      if (!matches.length) { list.appendChild(el("p", { class: "empty", text: "ما في مباريات نهائية بعد" })); return; }
+      const all = mtSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const matches = [...all.filter((m) => m.live && m.status !== "final"), ...all.filter((m) => m.status === "final")];
+      if (!matches.length) { list.appendChild(el("p", { class: "empty", text: "ما في مباريات بعد" })); return; }
 
       matches.forEach((m) => {
         const g = games[m.gameId] || {};
         const isSprint = g.type === "sprint";
         const teams = isSprint ? "سباق الضاحية" : (mosques[m.mosqueA]?.name || "-") + " ضد " + (mosques[m.mosqueB]?.name || "-");
+        const isLive = m.live && m.status !== "final";
         const kids = [
-          el("div", { class: "game-name", text: g.name || "" }),
+          el("div", { class: "game-name", text: (g.name || "") + (isLive ? "  ·  🔴 مباشرة" : "") }),
           el("div", { class: "teams", text: teams }),
         ];
         if (!isSprint) kids.push(el("div", { class: "score", text: (m.scoreA ?? 0) + " - " + (m.scoreB ?? 0) }));
@@ -98,6 +101,7 @@
       document.body.appendChild(a); a.click(); a.remove();
     }
 
+    import("./live.js").then(({ watchMatches }) => watchMatches(() => load().catch(() => {})));
     load().catch(() => { $("list").innerHTML = ""; $("list").appendChild(el("p", { class: "empty", text: "ما قدرنا نحمّل المباريات الحين" })); });
   </script>
   <script type="module" src="maintenance.js"></script>
