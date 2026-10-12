@@ -1,29 +1,36 @@
 /* نظام التصميم: ألوان، خطوط، أوضاع (فاتح/داكن) */
 :root {
-  --brand: #1E3A8A;
-  --brand-2: #3B82F6;
-  --gold: #D4A937;
-  --bg: #F1F5F9;
-  --surface: #FFFFFF;
-  --surface-2: #F8FAFC;
-  --text: #0F172A;
-  --muted: #64748B;
-  --border: #E2E8F0;
-  --danger: #DC2626;
-  --success: #16A34A;
-  --shadow: 0 10px 30px rgba(15, 23, 42, .08);
+  --brand: #163f30;
+  --brand-2: #246b4b;
+  --gold: #b8862f;
+  --bg: #f3f5ef;
+  --surface: #ffffff;
+  --surface-2: #f0f3ec;
+  --surface-3: #e5ebe1;
+  --text: #192c26;
+  --muted: #718078;
+  --border: rgba(35, 68, 53, .12);
+  --danger: #c4534e;
+  --success: #2f9e6e;
+  --shadow: 0 10px 32px rgba(27, 56, 40, .08);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, .16);
   --radius: 18px;
 }
 [data-theme="dark"] {
-  --bg: #0A0F1E;
-  --surface: #111A2E;
-  --surface-2: #17223B;
-  --text: #E2E8F0;
-  --muted: #94A3B8;
-  --border: #22304D;
-  --brand: #1D4ED8;
-  --brand-2: #60A5FA;
-  --shadow: 0 10px 30px rgba(0, 0, 0, .35);
+  --brand: #102c23;
+  --brand-2: #63bd8c;
+  --gold: #e2bd75;
+  --bg: #0b1715;
+  --surface: #12221e;
+  --surface-2: #192c26;
+  --surface-3: #22372e;
+  --text: #f0f4eb;
+  --muted: #99aca0;
+  --border: rgba(211, 230, 211, .09);
+  --danger: #ff8580;
+  --success: #4dd69a;
+  --shadow: 0 12px 36px rgba(0, 0, 0, .16);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, .35);
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
