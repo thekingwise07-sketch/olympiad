@@ -87,7 +87,7 @@
 <body>
   <header class="topbar">
     <div class="shell topbar-inner">
-      <a class="brand" href="app.html"><img src="logo-192.png" alt="أولمبياد المساجد" style="width:42px;height:42px;border-radius:12px;object-fit:contain;background:transparent"><span>أولمبياد <span>المساجد</span></span></a>
+      <a class="brand" href="app.html"><img src="logo-192.png" alt="أولمبياد المساجد" style="width:42px;height:42px;border-radius:12px;object-fit:contain;background:transparent"><span id="brand-name">أولمبياد <span>المساجد</span></span></a>
       <div class="actions">
         <button class="icon-btn" id="theme-toggle" type="button" aria-label="تبديل المظهر">🌓</button>
         <a class="acc-btn" id="auth-link" href="index.html">حسابي</a>
@@ -168,7 +168,16 @@
         const p = s.exists() ? s.data() : null;
         if (p && !p.disabled && !p.deleted && !p.mustChange) { profile = p; role = p.role; }
       }
-      $("greeting").innerHTML = profile ? "أهلاً " + esc(profile.name) : "أهلاً بك في <em>أولمبياد المساجد</em>";
+      const h = new Date().getHours();
+      const part = h < 12 ? "صباح الخير" : "مساء الخير";
+      const roleWord = { admin: "بالآدمن", organizer: "بالمنظم", mosque_supervisor: "بالمشرف", supervisor: "بالمسؤول" };
+      const greetLine = "السلام عليكم، " + part + " ";
+      if (profile) {
+        $("greeting").innerHTML = esc(greetLine) + "أهلاً " + (roleWord[role] || "") + " " + esc(profile.name);
+        $("brand-name").textContent = profile.name || "أولمبياد المساجد";
+      } else {
+        $("greeting").innerHTML = esc(greetLine) + "أهلاً بالزائر";
+      }
       $("role-line").textContent = profile ? "دورك: " + (ROLE_LABELS[role] || role) : "تصفح المباريات والترتيب والأخبار، وكن جزءاً من منافسة تجمعنا على الخير.";
       $("auth-link").textContent = profile ? "خروج" : "حسابي";
       $("auth-link").href = profile ? "#" : "index.html";

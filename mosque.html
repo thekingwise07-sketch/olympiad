@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#1E3A8A">
   <title>صفحة المسجد</title>
+  <link rel="icon" href="logo-192.png">
   <link rel="stylesheet" href="theme.css">
   <script>(function(){document.documentElement.setAttribute("data-theme",localStorage.getItem("theme")||"dark");})();</script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
@@ -19,6 +20,7 @@
 
   <script type="module">
     import { db, tf } from "./firebase.js";
+    import { cheerButton } from "./cheer.js";
     import { doc, getDoc, getDocs, collection, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const $ = (id) => document.getElementById(id);
@@ -86,6 +88,7 @@
       const top = el("div", { class: "top" }, [
         m.logo ? el("img", { class: "logo", src: m.logo, alt: "" }) : el("div", { class: "logo-ph", style: { background: m.color || "#1E3A8A" } }),
         el("div", { class: "mname", text: m.name || "-" }),
+        cheerButton(id, m.cheers || 0),
       ]);
       const stats = el("div", { class: "stats" }, [
         el("div", { class: "stat" }, [el("b", { text: String(pts) }), el("span", { text: "نقاط" })]),

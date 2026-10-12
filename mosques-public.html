@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#1E3A8A">
   <title>المساجد</title>
+  <link rel="icon" href="logo-192.png">
   <link rel="stylesheet" href="theme.css">
   <script>(function(){document.documentElement.setAttribute("data-theme",localStorage.getItem("theme")||"dark");})();</script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
@@ -22,6 +23,7 @@
   </nav>
   <script type="module">
     import { db, tf } from "./firebase.js";
+    import { cheerButton } from "./cheer.js";
     import { collection, getDocs, query } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     const list = document.getElementById("list");
     getDocs(query(collection(db, "mosques"), ...tf())).then((snap) => {
@@ -36,6 +38,7 @@
         else { logo.className = "ph"; logo.style.background = m.color || "#1E3A8A"; }
         const n = document.createElement("div"); n.className = "name"; n.textContent = m.name || "-";
         a.append(logo, n);
+        a.appendChild(cheerButton(m.id, m.cheers || 0));
         list.appendChild(a);
       });
     }).catch(() => { list.innerHTML = "<p class='empty'>ما قدرنا نحمّل المساجد</p>"; });
