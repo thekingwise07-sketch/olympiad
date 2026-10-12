@@ -77,3 +77,25 @@ export async function createAuthAccount(username, password) {
 export function tf() {
   return localStorage.getItem("proofMode") === "1" ? [] : [where("isTest", "==", false)];
 }
+
+// الصلاحيات: الآدمن يملك كل شي، وغيره حسب الأعلام المفعّلة له (أو الافتراضي حسب الدور)
+export const PERMS = {
+  news: "الأخبار",
+  rules: "القوانين",
+  brackets: "الجداول الإقصائية",
+  matches: "تسجيل المباريات",
+  students: "الطلاب والفرق",
+  mosque: "شعار المسجد وقفل التسجيل",
+  log: "سجل العمليات",
+};
+const DEFAULT_PERMS = {
+  supervisor: ["news", "log"],
+  organizer: ["matches"],
+  mosque_supervisor: ["students", "mosque"],
+};
+export function hasPerm(profile, name) {
+  if (!profile) return false;
+  if (profile.role === "admin") return true;
+  if (profile.perms && name in profile.perms) return profile.perms[name] === true;
+  return (DEFAULT_PERMS[profile.role] || []).includes(name);
+}

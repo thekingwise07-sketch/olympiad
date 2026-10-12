@@ -23,7 +23,7 @@
   </nav>
 
   <script type="module">
-    import { auth, db } from "./firebase.js";
+    import { auth, db, hasPerm } from "./firebase.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { collection, doc, getDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -39,7 +39,7 @@
       if (!user) return location.replace("index.html");
       const snap = await getDoc(doc(db, "users", user.uid));
       const p = snap.exists() ? snap.data() : null;
-      if (!p || p.disabled || p.deleted || !["admin", "supervisor"].includes(p.role)) return location.replace("app.html");
+      if (!p || p.disabled || p.deleted || !hasPerm(p, "log")) return location.replace("app.html");
 
       const logs = await getDocs(query(collection(db, "auditLog"), orderBy("at", "desc"), limit(100)));
       const list = $("list");

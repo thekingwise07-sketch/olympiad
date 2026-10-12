@@ -74,7 +74,7 @@
   </nav>
 
   <script type="module">
-    import { auth, db, ROLE_LABELS, genPassword, createAuthAccount, usernameToEmail } from "./firebase.js";
+    import { auth, db, ROLE_LABELS, genPassword, createAuthAccount, usernameToEmail, PERMS, hasPerm } from "./firebase.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import {
       collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, query, orderBy, serverTimestamp,
@@ -158,6 +158,30 @@
       return "";
     }
 
+
+    // ---------- الصلاحيات (الآدمن يفعّلها لكل حساب) ----------
+    function permPanel(uid, u) {
+      const box = el("div", { class: "hidden", style: { marginTop: "10px" } });
+      box.appendChild(el("div", { class: "item-meta", text: "فعّل الصلاحيات اللي تبيها لهذا الحساب:" }));
+      Object.entries(PERMS).forEach(([k, label]) => {
+        const cb = el("input", { type: "checkbox", checked: hasPerm({ role: u.role, perms: u.perms || {} }, k) });
+        cb.dataset.k = k;
+        box.appendChild(el("label", { class: "check" }, [cb, el("span", { text: label })]));
+      });
+      box.appendChild(el("button", { type: "button", text: "حفظ الصلاحيات", onclick: async () => {
+        const perms = {};
+        box.querySelectorAll("input[data-k]").forEach((c) => { perms[c.dataset.k] = c.checked; });
+        try {
+          await updateDoc(doc(db, "users", uid), { perms, updatedAt: serverTimestamp() });
+          await audit("account.perms", uid, perms);
+          await loadUsers();
+        } catch (e) {
+          alert(errText(e));
+        }
+      } }));
+      return box;
+    }
+
     function renderUser(uid, u) {
       const off = !!u.disabled;
       const isSelf = uid === me.uid;
@@ -179,7 +203,10 @@
         el("button", { class: "danger", type: "button", text: "حذف", disabled: isSelf, onclick: () => removeUser(uid, u) }),
       ]);
 
-      return el("div", { class: "user" }, [head, actions]);
+      const permBox = permPanel(uid, u);
+      const permBtn = el("button", { class: "ghost", type: "button", text: "الصلاحيات", onclick: () => permBox.classList.toggle("hidden") });
+      actions.appendChild(permBtn);
+      return el("div", { class: "user" }, [head, actions, permBox]);
     }
 
     // ---------- الفورم ----------

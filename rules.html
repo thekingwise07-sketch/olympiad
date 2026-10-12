@@ -37,7 +37,7 @@
     <a href="rules.html" class="active"><span class="ic">📜</span>القوانين</a>
   </nav>
   <script type="module">
-    import { auth, db } from "./firebase.js";
+    import { auth, db, hasPerm } from "./firebase.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { collection, doc, getDoc, getDocs, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -60,7 +60,7 @@
       if (user) {
         const snap = await getDoc(doc(db, "users", user.uid));
         const p = snap.exists() ? snap.data() : null;
-        isAdmin = !!p && p.role === "admin" && !p.disabled && !p.deleted;
+        isAdmin = !!p && !p.disabled && !p.deleted && hasPerm(p, "rules");
       }
       $("adminCard").classList.toggle("hidden", !isAdmin);
       await loadRules();

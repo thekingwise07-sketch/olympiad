@@ -70,7 +70,7 @@
   </nav>
 
   <script type="module">
-    import { auth, db, tf } from "./firebase.js";
+    import { auth, db, tf, hasPerm } from "./firebase.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { collection, doc, getDoc, getDocs, updateDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -93,7 +93,7 @@
       if (!matchId) return bad("المباراة غير محددة");
       const uSnap = await getDoc(doc(db, "users", user.uid));
       const p = uSnap.exists() ? uSnap.data() : null;
-      if (!p || p.disabled || p.deleted || !["admin", "organizer"].includes(p.role)) return bad("ما عندك صلاحية لهذي الصفحة");
+      if (!p || p.disabled || p.deleted || !hasPerm(p, "matches")) return bad("ما عندك صلاحية لهذي الصفحة");
       me = { uid: user.uid, ...p };
 
       const mSnap = await getDoc(doc(db, "matches", matchId));

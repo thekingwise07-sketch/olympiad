@@ -95,7 +95,7 @@
   </nav>
 
   <script type="module">
-    import { auth, db, tf } from "./firebase.js";
+    import { auth, db, tf, hasPerm } from "./firebase.js";
     import { compressLogo } from "./logo.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, setDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -115,7 +115,7 @@
       if (!user) return location.replace("index.html");
       const snap = await getDoc(doc(db, "users", user.uid));
       const p = snap.exists() ? snap.data() : null;
-      if (!p || p.disabled || p.deleted || p.mustChange || !["admin", "mosque_supervisor"].includes(p.role)) {
+      if (!p || p.disabled || p.deleted || p.mustChange || !hasPerm(p, "students")) {
         return location.replace("app.html");
       }
       me = { uid: user.uid, ...p };

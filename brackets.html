@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0A0F1E">
+  <title>الجداول</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="theme.css">
+  <script>(function(){document.documentElement.setAttribute("data-theme",localStorage.getItem("theme")||"dark");})();</script>
+  <style>
+    .tree { display: flex; gap: 18px; overflow-x: auto; padding: 8px 4px 16px; -webkit-overflow-scrolling: touch; }
+    .round { min-width: 210px; display: flex; flex-direction: column; justify-content: space-around; gap: 14px; }
+    .round-title { text-align: center; font-weight: 800; color: var(--gold); font-size: 14px; }
+    .bm { background: var(--surface-2); border: 1px solid var(--border); border-radius: 14px; padding: 8px; }
+    .side { display: flex; align-items: center; gap: 8px; padding: 6px 4px; min-height: 40px; }
+    .side .sn { flex: 1; font-size: 14px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .side .sc { font-weight: 900; color: var(--gold); direction: ltr; min-width: 22px; text-align: center; }
+    .side.win .sn { color: var(--success); }
+    .side.lose { opacity: .45; }
+    .side.lose .sn { text-decoration: line-through; }
+    .tlogo { width: 26px; height: 26px; border-radius: 8px; object-fit: cover; flex: 0 0 26px; }
+    .tph { width: 26px; height: 26px; border-radius: 8px; flex: 0 0 26px; }
+    .pending { color: var(--muted); font-size: 12px; text-align: center; padding: 6px; }
+    .tie { display: flex; gap: 6px; margin-top: 6px; }
+    .tie button { margin: 0; min-height: 34px; font-size: 12px; padding: 0 8px; }
+    .third { margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="topbar"><div class="brand">الجداول <span>الإقصائية</span></div><a class="btn ghost" href="app.html">الرئيسية</a></div>
+
+  <main class="wrap">
+    <section class="card" id="listCard"><h2>الجداول</h2><div id="list"><p class="empty">جاري التحميل...</p></div></section>
+
+    <section class="card hidden" id="viewCard"><div id="view"></div></section>
+
+    <section class="card hidden" id="adminCard">
+      <h2>إنشاء جدول جديد (للآدمن)</h2>
+      <label for="bName">اسم الجدول</label>
+      <input id="bName" maxlength="60" placeholder="مثال: دوري الـ 16 لكرة القدم">
+      <label for="bGame">اللعبة</label>
+      <select id="bGame"></select>
+      <label for="bSize">عدد الفرق</label>
+      <select id="bSize">
+        <option value="4">4</option><option value="8">8</option><option value="16" selected>16</option><option value="32">32</option><option value="64">64</option>
+      </select>
+      <label class="switch" style="margin-top:12px"><input id="bThird" type="checkbox"> مباراة المركز الثالث</label>
+      <label for="teamPick">أضف فريق</label>
+      <select id="teamPick"></select>
+      <div class="row"><button id="addTeamBtn" type="button" class="ghost">إضافة للترتيب</button></div>
+      <div id="teamOrder" style="margin-top:10px"></div>
+      <p id="bMsg" class="msg"></p>
+      <button id="createBtn" type="button">إنشاء الجدول</button>
+    </section>
+  </main>
+
+  <nav class="tabbar">
+    <a href="app.html"><span class="ic">🏠</span>الرئيسية</a>
+    <a href="matches-public.html"><span class="ic">⚽</span>المباريات</a>
+    <a href="ranking.html"><span class="ic">🏆</span>الترتيب</a>
+    <a href="brackets.html" class="active"><span class="ic">🧩</span>الجداول</a>
+    <a href="news.html"><span class="ic">📰</span>الأخبار</a>
+    <a href="rules.html"><span class="ic">📜</span>القوانين</a>
+  </nav>
+
+  <script type="module">
+    import { auth, db, tf, hasPerm } from "./firebase.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { collection, doc, getDoc, getDocs, addDoc, updateDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+    const esc = (t) => { const d = document.createElement("div"); d.textContent = t ?? ""; return d.innerHTML; };
+    let me = null, mosques = {}, teams = {}, games = {};
+    let order = [];           // فرق الجدول الجديد بالترتيب
+    let current = null;       // الجدول المعروض
+
+    onAuthStateChanged(auth, async (user) => {
+      me = null;
+      if (user) {
+        const s = await getDoc(doc(db, "users", user.uid));
+        const p = s.exists() ? s.data() : null;
+        if (p && !p.disabled && !p.deleted && hasPerm(p, "brackets")) me = { uid: user.uid, ...p };
+      }
+      $("adminCard").classList.toggle("hidden", !me);
+      await loadBase();
+      await loadList();
+    });
+
+    async function loadBase() {
+      const [m, t, g] = await Promise.all([
+        getDocs(query(collection(db, "mosques"), ...tf())),
+        getDocs(query(collection(db, "teams"), ...tf())),
+        getDocs(query(collection(db, "games"), ...tf())),
+      ]);
+      mosques = Object.fromEntries(m.docs.map((d) => [d.id, d.data()]));
+      teams = Object.fromEntries(t.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
+      games = Object.fromEntries(g.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
+      if (me) {
+        const gs = Object.values(games).filter((x) => x.type !== "sprint" && !x.archived);
+        $("bGame").innerHTML = gs.map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("");
+        const ts = Object.values(teams).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+        $("teamPick").innerHTML = ts.map((x) => `<option value="${esc(x.id)}">${esc((mosques[x.mosqueId] || {}).name || "")} · ${esc(x.name)}</option>`).join("");
+      }
+    }
+
+    function logoOf(teamId) {
+      const t = teams[teamId] || {};
+      const m = mosques[t.mosqueId] || {};
+      return { name: t.name ? (m.name || "") + " · " + t.name : "بانتظار الفريق", logo: m.logo, color: m.color || "#1E3A8A" };
+    }
+    function badge(teamId) {
+      const info = logoOf(teamId);
+      return info.logo ? `<img class="tlogo" src="${info.logo}" alt="">` : `<span class="tph" style="background:${info.color}"></span>`;
+    }
+
+    // ---------- القائمة ----------
+    async function loadList() {
+      const snap = await getDocs(query(collection(db, "brackets"), ...tf()));
+      const list = $("list");
+      list.innerHTML = "";
+      if (snap.empty) { list.innerHTML = '<p class="empty">ما في جداول بعد</p>'; return; }
+      snap.docs.map((d) => ({ id: d.id, ...d.data() })).forEach((b) => {
+        const row = document.createElement("div");
+        row.className = "item";
+        row.style.cursor = "pointer";
+        row.innerHTML = `<div class="item-name">${esc(b.name)}</div><div class="item-meta">${esc((games[b.gameId] || {}).name || "")} · ${b.size} فريق</div>`;
+        row.onclick = () => openBracket(b);
+        list.appendChild(row);
+      });
+    }
+
+    // ---------- بناء الشجرة من المباريات الفعلية ----------
+    function roundName(count) {
+      if (count === 2) return "النهائي";
+      if (count === 4) return "نصف النهائي";
+      if (count === 8) return "ربع النهائي";
+      return "دور الـ " + count;
+    }
+
+    function winnerOf(m) {
+      if (!m || m.status !== "final") return null;
+      if (m.scoreA > m.scoreB) return m.teamAId;
+      if (m.scoreB > m.scoreA) return m.teamBId;
+      return m.winnerSide === "A" ? m.teamAId : m.winnerSide === "B" ? m.teamBId : null;
+    }
+    function loserOf(m) {
+      const w = winnerOf(m);
+      if (!w || !m) return null;
+      return w === m.teamAId ? m.teamBId : m.teamAId;
+    }
+
+    async function openBracket(b) {
+      current = b;
+      const mSnap = await getDocs(query(collection(db, "matches"), where("bracketId", "==", b.id), ...tf()));
+      const matchList = mSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const byKey = {};
+      matchList.forEach((m) => { byKey[m.round + "-" + m.slot] = m; });
+
+      const rounds = Math.log2(b.size);
+      const view = $("view");
+      view.innerHTML = `<h2>${esc(b.name)}</h2><div class="item-meta">${esc((games[b.gameId] || {}).name || "")}</div><div class="tree" id="tree"></div>`;
+      const tree = $("tree");
+
+      // جولات: r=0 فرق البداية، r أكبر = الأدوار اللاحقة
+      let champion = null;
+      for (let r = 0; r < rounds; r++) {
+        const count = b.size / Math.pow(2, r);
+        const col = document.createElement("div");
+        col.className = "round";
+        col.innerHTML = `<div class="round-title">${roundName(count)}</div>`;
+        for (let i = 0; i < count / 2; i++) {
+          const m = byKey[r + "-" + i];
+          let a = null, bId = null;
+          if (r === 0) { a = b.teamIds[2 * i]; bId = b.teamIds[2 * i + 1]; }
+          else {
+            const fa = byKey[(r - 1) + "-" + (2 * i)], fb = byKey[(r - 1) + "-" + (2 * i + 1)];
+            a = winnerOf(fa); bId = winnerOf(fb);
+          }
+          const box = document.createElement("div");
+          box.className = "bm";
+          const w = winnerOf(m);
+          const sideRow = (tid, score, side) => {
+            const cls = !m || !w ? "" : tid === w ? "win" : "lose";
+            return `<div class="side ${cls}">${tid ? badge(tid) : ""}<span class="sn">${tid ? esc(logoOf(tid).name) : "بانتظار الفائز"}</span><span class="sc">${m ? (score ?? 0) : "-"}</span></div>`;
+          };
+          box.innerHTML = sideRow(a, m?.scoreA, "A") + sideRow(bId, m?.scoreB, "B")
+            + (m ? `<div class="meta" style="text-align:center">${esc(m.status === "final" ? "نهائية" : "مسودة")}</div>` : "");
+          if (me && m && m.status === "final" && !winnerOf({ ...m, winnerSide: null }) && m.scoreA === m.scoreB) {
+            const tie = document.createElement("div");
+            tie.className = "tie";
+            tie.innerHTML = `<button class="ghost" data-s="A">فاز الأول</button><button class="ghost" data-s="B">فاز الثاني</button>`;
+            tie.querySelectorAll("button").forEach((btn) => btn.onclick = async () => {
+              await updateDoc(doc(db, "matches", m.id), { winnerSide: btn.dataset.s });
+              openBracket(b);
+            });
+            box.appendChild(tie);
+          }
+          col.appendChild(box);
+          if (m && r === rounds - 1) champion = w;
+        }
+        tree.appendChild(col);
+      }
+
+      // مباراة المركز الثالث
+      if (b.thirdPlace && rounds >= 2) {
+        const third = byKey["third-0"];
+        const sLeft = byKey[(rounds - 2) + "-0"], sRight = byKey[(rounds - 2) + "-1"];
+        const col = document.createElement("div");
+        col.className = "round third";
+        col.innerHTML = `<div class="round-title">المركز الثالث</div>`;
+        const box = document.createElement("div");
+        box.className = "bm";
+        const a = loserOf(sLeft), bb = loserOf(sRight);
+        box.innerHTML = `<div class="side">${a ? badge(a) : ""}<span class="sn">${a ? esc(logoOf(a).name) : "بانتظار"}</span><span class="sc">${third ? third.scoreA : "-"}</span></div>
+          <div class="side">${bb ? badge(bb) : ""}<span class="sn">${bb ? esc(logoOf(bb).name) : "بانتظار"}</span><span class="sc">${third ? third.scoreB : "-"}</span></div>`;
+        col.appendChild(box);
+        tree.appendChild(col);
+      }
+
+      if (champion) {
+        const cc = document.createElement("div");
+        cc.className = "card";
+        cc.style.marginTop = "12px";
+        cc.innerHTML = `<div class="muted">البطل</div><div class="gold" style="font-size:20px;font-weight:900">${esc(logoOf(champion).name)}</div>`;
+        view.appendChild(cc);
+      }
+      $("listCard").classList.add("hidden");
+      $("viewCard").classList.remove("hidden");
+      await syncNext(b, byKey, rounds);
+    }
+
+    // ---------- إنشاء المباريات التالية تلقائياً (من الآدمن) ----------
+    async function syncNext(b, byKey, rounds) {
+      if (!me) return;
+      for (let r = 1; r < rounds; r++) {
+        const count = b.size / Math.pow(2, r);
+        for (let i = 0; i < count / 2; i++) {
+          const key = r + "-" + i;
+          if (byKey[key]) continue;
+          const fa = byKey[(r - 1) + "-" + (2 * i)], fb = byKey[(r - 1) + "-" + (2 * i + 1)];
+          const a = winnerOf(fa), bb = winnerOf(fb);
+          if (!a || !bb) continue;
+          await createMatch(b, a, bb, r, i);
+        }
+      }
+      if (b.thirdPlace && rounds >= 2) {
+        const l = byKey[(rounds - 2) + "-0"], rr = byKey[(rounds - 2) + "-1"];
+        if (!byKey["third-0"] && l && rr && l.status === "final" && rr.status === "final") {
+          const a = loserOf(l), bb = loserOf(rr);
+          if (a && bb) await createMatch(b, a, bb, "third", 0);
+        }
+      }
+    }
+
+    async function createMatch(b, teamAId, teamBId, round, slot) {
+      const ta = teams[teamAId] || {}, tb = teams[teamBId] || {};
+      await addDoc(collection(db, "matches"), {
+        gameId: b.gameId, mosqueA: ta.mosqueId || "", mosqueB: tb.mosqueId || "",
+        teamAId, teamBId, scoreA: 0, scoreB: 0, status: "draft",
+        organizerUid: me.uid, bracketId: b.id, round, slot, isTest: false,
+        createdAt: serverTimestamp(),
+      });
+    }
+
+    // ---------- إنشاء الجدول ----------
+    function renderOrder() {
+      $("teamOrder").innerHTML = order.map((tid, i) => `<div class="item" style="display:flex;align-items:center;gap:8px">
+        <span class="gold">${i + 1}</span><span style="flex:1">${esc(logoOf(tid).name)}</span>
+        <button class="ghost" data-u="${i}">▲</button><button class="ghost" data-d="${i}">▼</button><button class="danger" data-x="${i}">حذف</button></div>`).join("")
+        + `<p class="meta">${order.length} من ${$("bSize").value}</p>`;
+      $("teamOrder").querySelectorAll("[data-u]").forEach((b) => b.onclick = () => { const i = +b.dataset.u; if (i > 0) [order[i - 1], order[i]] = [order[i], order[i - 1]]; renderOrder(); });
+      $("teamOrder").querySelectorAll("[data-d]").forEach((b) => b.onclick = () => { const i = +b.dataset.d; if (i < order.length - 1) [order[i + 1], order[i]] = [order[i], order[i + 1]]; renderOrder(); });
+      $("teamOrder").querySelectorAll("[data-x]").forEach((b) => b.onclick = () => { order.splice(+b.dataset.x, 1); renderOrder(); });
+    }
+
+    $("addTeamBtn").addEventListener("click", () => {
+      const tid = $("teamPick").value;
+      const size = +$("bSize").value;
+      if (!tid) return;
+      if (order.includes(tid)) return ($("bMsg").textContent = "الفريق مضاف قبل");
+      if (order.length >= size) return ($("bMsg").textContent = "وصلت للعدد المحدد");
+      order.push(tid);
+      $("bMsg").textContent = "";
+      renderOrder();
+    });
+    $("bSize").addEventListener("change", () => { order = order.slice(0, +$("bSize").value); renderOrder(); });
+
+    $("createBtn").addEventListener("click", async () => {
+      const name = $("bName").value.trim();
+      const size = +$("bSize").value;
+      const gameId = $("bGame").value;
+      const msg = $("bMsg");
+      msg.className = "msg";
+      if (name.length < 3) return (msg.textContent = "اكتب اسم الجدول");
+      if (!gameId) return (msg.textContent = "اختر اللعبة");
+      if (![2, 4, 8, 16, 32, 64].includes(size)) return (msg.textContent = "عدد الفرق لازم يكون 4 أو 8 أو 16 أو 32 أو 64");
+      if (order.length !== size) return (msg.textContent = "لازم تضيف " + size + " فريق بالضبط");
+      $("createBtn").disabled = true;
+      try {
+        const bRef = await addDoc(collection(db, "brackets"), {
+          name, gameId, size, thirdPlace: $("bThird").checked, teamIds: order.slice(), isTest: false,
+          createdAt: serverTimestamp(), createdBy: me.uid,
+        });
+        const b = { id: bRef.id, name, gameId, size, thirdPlace: $("bThird").checked, teamIds: order.slice() };
+        for (let i = 0; i < size / 2; i++) {
+          await createMatch(b, order[2 * i], order[2 * i + 1], 0, i);
+        }
+        msg.classList.add("ok");
+        msg.textContent = "تم إنشاء الجدول والمباريات الأولى";
+        order = [];
+        renderOrder();
+        await loadList();
+      } catch (e) {
+        msg.classList.add("err");
+        msg.textContent = (e?.code ? "[" + e.code + "] " : "") + (e?.message || "صار خطأ");
+      } finally {
+        $("createBtn").disabled = false;
+      }
+    });
+  </script>
+  <script type="module" src="maintenance.js"></script>
+</body>
+</html>

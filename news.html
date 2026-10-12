@@ -43,7 +43,7 @@
     <a href="rules.html" class=""><span class="ic">📜</span>القوانين</a>
   </nav>
   <script type="module">
-    import { auth, db, tf } from "./firebase.js";
+    import { auth, db, tf, hasPerm } from "./firebase.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -56,7 +56,7 @@
       if (user) {
         const snap = await getDoc(doc(db, "users", user.uid));
         const p = snap.exists() ? snap.data() : null;
-        if (p && !p.disabled && !p.deleted && !p.mustChange && ["admin", "supervisor"].includes(p.role)) {
+        if (p && !p.disabled && !p.deleted && !p.mustChange && hasPerm(p, "news")) {
           me = { uid: user.uid, ...p };
         }
       }

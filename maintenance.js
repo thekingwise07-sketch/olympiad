@@ -4,6 +4,10 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/f
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 async function checkMaintenance() {
+  // صفحة الدخول تبقى مفتوحة عشان الآدمن يقدر يدخل ويطفي الصيانة
+  const path = location.pathname;
+  if (path.endsWith("/") || path.endsWith("index.html")) return;
+
   const siteSnap = await getDoc(doc(db, "settings", "site"));
   const site = siteSnap.exists() ? siteSnap.data() : {};
   if (!site.maintenance) return;
