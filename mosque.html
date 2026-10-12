@@ -12,7 +12,7 @@
 <body>
   <div class="topbar"><div class="brand">صفحة المسجد</div><a class="btn ghost" href="app.html">الرئيسية</a></div>
 
-  <main class="wrap">
+  <main class="wrap" style="padding-bottom:100px">
     <section class="card" id="top"><p class="empty">جاري التحميل...</p></section>
     <section class="card"><h2>الألعاب والطلاب</h2><div id="games"><p class="empty">جاري التحميل...</p></div></section>
   </main>
@@ -154,5 +154,12 @@
     load().catch(() => { $("top").innerHTML = "<p class='empty'>ما قدرنا نحمّل الصفحة الحين</p>"; });
   </script>
   <script type="module" src="maintenance.js"></script>
+  <nav class="tabbar" aria-label="التنقل الرئيسي">
+    <a href="app.html"><span class="ic">🏠</span>الرئيسية</a>
+    <a href="matches-public.html"><span class="ic">⚽</span>المباريات</a>
+    <a href="ranking.html" class="active"><span class="ic">🏆</span>الترتيب</a>
+    <a href="mosques-public.html" class="active"><span class="ic">🕌</span>المساجد</a>
+    <a href="news.html"><span class="ic">📰</span>الأخبار</a>
+  </nav>
 </body>
 </html>
