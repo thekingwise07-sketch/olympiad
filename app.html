@@ -87,7 +87,7 @@
 <body>
   <header class="topbar">
     <div class="shell topbar-inner">
-      <a class="brand" href="app.html"><img src="logo-192.png" alt="أولمبياد المساجد" style="width:42px;height:42px;border-radius:12px;object-fit:contain;background:transparent"><span id="brand-name">أولمبياد <span>المساجد</span></span></a>
+      <a class="brand" href="app.html"><img src="logo-192.png" alt="" style="width:42px;height:42px;border-radius:12px;object-fit:contain;background:transparent"><span id="brand-name" style="font-weight:900;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px">أولمبياد <span>المساجد</span></span></a>
       <div class="actions">
         <button class="icon-btn" id="theme-toggle" type="button" aria-label="تبديل المظهر">🌓</button>
         <a class="acc-btn" id="auth-link" href="index.html">حسابي</a>
@@ -159,6 +159,16 @@
       admin: [["🛠️", "الأدوات", "tools.html"], ["👤", "الحسابات", "accounts.html"], ["🕌", "المساجد", "mosques.html"], ["🎯", "الألعاب", "games.html"], ["🧾", "السجل", "log.html"], ["🧩", "الجداول", "brackets.html"]],
     };
 
+
+    function showWelcome(text) {
+      const box = document.createElement("div");
+      box.setAttribute("style", "position:fixed;top:82px;left:50%;transform:translate(-50%,-12px);z-index:95;max-width:calc(100% - 32px);padding:12px 18px;border-radius:14px;background:var(--surface);border:1px solid var(--gold);box-shadow:0 14px 34px rgba(0,0,0,.28);font-weight:800;font-size:14px;text-align:center;color:var(--text);opacity:0;transition:opacity .35s,transform .35s;pointer-events:none;font-family:Tajawal,sans-serif");
+      box.textContent = text;
+      document.body.appendChild(box);
+      requestAnimationFrame(() => { box.style.opacity = "1"; box.style.transform = "translate(-50%,0)"; });
+      setTimeout(() => { box.style.opacity = "0"; box.style.transform = "translate(-50%,-12px)"; setTimeout(() => box.remove(), 400); }, 7000);
+    }
+
     let mosques = {}, games = {}, profile = null, role = "visitor";
 
     onAuthStateChanged(auth, async (user) => {
@@ -168,6 +178,7 @@
         const p = s.exists() ? s.data() : null;
         if (p && !p.disabled && !p.deleted && !p.mustChange) { profile = p; role = p.role; }
       }
+      $("greeting").innerHTML = "أهلاً بك في <em>أولمبياد المساجد</em>";
       const h = new Date().getHours();
       const part = h < 12 ? "صباح الخير" : "مساء الخير";
       const roleWord = { admin: "بالآدمن", organizer: "بالمنظم", mosque_supervisor: "بالمشرف", supervisor: "بالمسؤول" };
@@ -175,8 +186,10 @@
       if (profile) {
         $("greeting").innerHTML = esc(greetLine) + "أهلاً " + (roleWord[role] || "") + " " + esc(profile.name);
         $("brand-name").textContent = profile.name || "أولمبياد المساجد";
+        showWelcome(greetLine + (roleWord[role] ? "أهلاً " + roleWord[role] + " " + profile.name : "أهلاً " + profile.name));
       } else {
-        $("greeting").innerHTML = esc(greetLine) + "أهلاً بالزائر";
+        $("brand-name").textContent = "أولمبياد المساجد";
+        showWelcome(greetLine + "أهلاً بالزائر");
       }
       $("role-line").textContent = profile ? "دورك: " + (ROLE_LABELS[role] || role) : "تصفح المباريات والترتيب والأخبار، وكن جزءاً من منافسة تجمعنا على الخير.";
       $("auth-link").textContent = profile ? "خروج" : "حسابي";
