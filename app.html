@@ -7,7 +7,7 @@
   <title>أولمبياد المساجد | الرئيسية</title>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
   <link rel="icon" href="logo-192.png">
-  <script>(function(){document.documentElement.setAttribute("data-theme",localStorage.getItem("theme")||"dark");})();</script>
+  <script>(function(){document.documentElement.setAttribute("data-theme",localStorage.getItem("theme")||"dark");document.documentElement.classList.add("auth-pending");setTimeout(function(){document.documentElement.classList.remove("auth-pending");},2500);})();</script>
   <style>
     :root { color-scheme: light; --bg:#f3f5ef; --surface:#fff; --surface-2:#f0f3ec; --surface-3:#e5ebe1; --text:#192c26; --muted:#718078; --border:rgba(35,68,53,.12); --primary:#246b4b; --accent:#d8b56b; --accent-2:#f1dba8; --hero-start:#163f30; --hero-end:#246b4b; --nav-bg:rgba(255,255,255,.92); --gold-text:#a97b2b; --success:#2f9e6e; --shadow:0 10px 32px rgba(27,56,40,.08); --shadow-lg:0 24px 60px rgba(0,0,0,.16); --radius:18px; }
     [data-theme="dark"] { color-scheme: dark; --bg:#0b1715; --surface:#12221e; --surface-2:#192c26; --surface-3:#22372e; --text:#f0f4eb; --muted:#99aca0; --border:rgba(211,230,211,.09); --primary:#63bd8c; --accent:#e2bd75; --accent-2:#f3dfb2; --hero-start:#102c23; --hero-end:#205b40; --nav-bg:rgba(13,26,22,.94); --gold-text:#e2bd75; --success:#4dd69a; --shadow:0 12px 36px rgba(0,0,0,.16); --shadow-lg:0 24px 60px rgba(0,0,0,.35); }
@@ -81,6 +81,9 @@
     .sheet-links a { padding: 14px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--border); font-weight: 800; font-size: 13px; }
     .toast { position: fixed; left: 50%; bottom: 110px; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--border); padding: 10px 16px; border-radius: 12px; font-size: 13px; font-weight: 700; opacity: 0; transition: opacity .2s; pointer-events: none; box-shadow: var(--shadow); }
     .toast.show { opacity: 1; }
+    .auth-pending main, .auth-pending .tabbar, .auth-pending #brand-name, .auth-pending .actions { opacity: 0; }
+    #brand-name, .actions { transition: opacity .25s ease; }
+    main, .tabbar { transition: opacity .25s ease; }
     @media (prefers-reduced-motion: reduce) { *, *::before { transition: none !important; animation: none !important; } }
   </style>
 </head>
@@ -196,6 +199,7 @@
       $("auth-link").href = profile ? "#" : "index.html";
       $("auth-link").onclick = async (e) => { if (profile) { e.preventDefault(); await signOut(auth); location.reload(); } };
       $("sheet-links").innerHTML = ROLE_LINKS[role].map(([ic, t, h]) => `<a href="${h}">${ic} ${t}</a>`).join("");
+      document.documentElement.classList.remove("auth-pending");
     });
 
     function badge(m) {
