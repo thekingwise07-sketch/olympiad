@@ -86,7 +86,7 @@
     let me = null, mosques = {}, games = {}, matches = [], selected = null, players = [];
 
     onAuthStateChanged(auth, async (user) => {
-      if (!user) return location.replace("index.html");
+      if (!user) return location.replace("login.html");
       const s = await getDoc(doc(db, "users", user.uid));
       const p = s.exists() ? s.data() : null;
       if (!p || p.disabled || p.deleted || !["organizer", "admin"].includes(p.role)) return location.replace("app.html");

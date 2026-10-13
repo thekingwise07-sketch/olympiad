@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#1E3A8A">
   <title>سجل العمليات</title>
+  <link rel="icon" href="logo-192.png">
   <link rel="stylesheet" href="theme.css">
   <script>(function(){document.documentElement.setAttribute("data-theme",localStorage.getItem("theme")||"dark");})();</script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
@@ -37,7 +38,7 @@
     }
 
     onAuthStateChanged(auth, async (user) => {
-      if (!user) return location.replace("index.html");
+      if (!user) return location.replace("login.html");
       const snap = await getDoc(doc(db, "users", user.uid));
       const p = snap.exists() ? snap.data() : null;
       if (!p || p.disabled || p.deleted || !hasPerm(p, "log")) return location.replace("app.html");

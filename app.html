@@ -31,6 +31,7 @@
     .pill { display: inline-block; padding: 6px 12px; border-radius: 30px; border: 1px solid rgba(245,225,180,.25); color: #f3dfb2; font-size: 12px; font-weight: 700; background: rgba(8,25,17,.25); }
     .hero h1 { margin: 18px 0 6px; font-size: clamp(27px, 6vw, 38px); font-weight: 900; line-height: 1.2; }
     .hero h1 em { color: #f1d8a0; font-style: normal; }
+    .hero p.hype { margin: 6px 0 10px; color: #f3dfb2; font-size: 14px; font-weight: 700; line-height: 1.8; }
     .hero p { margin: 0; color: rgba(255,253,246,.78); font-size: 14px; }
     .hero-link { display: inline-flex; margin-top: 20px; min-height: 44px; align-items: center; padding: 0 16px; border-radius: 14px; background: linear-gradient(135deg,#f4e1b4,#d8b56b); color: #193b29; font-weight: 900; font-size: 13px; }
     .section { margin-top: 32px; }
@@ -93,7 +94,7 @@
       <a class="brand" href="app.html"><img src="logo-192.png" alt="" style="width:42px;height:42px;border-radius:12px;object-fit:contain;background:transparent"><span id="brand-name" style="font-weight:900;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px">أولمبياد <span>المساجد</span></span></a>
       <div class="actions">
         <button class="icon-btn" id="theme-toggle" type="button" aria-label="تبديل المظهر">🌓</button>
-        <a class="acc-btn" id="auth-link" href="index.html">حسابي</a>
+        <a class="acc-btn" id="auth-link" href="login.html">حسابي</a>
       </div>
     </div>
   </header>
@@ -102,6 +103,7 @@
     <section class="hero">
       <span class="pill">موسم التنافس والإخاء</span>
       <h1 id="greeting">أهلاً بك في <em>أولمبياد المساجد</em></h1>
+      <p class="hype">منافسة تجمعنا، وأخلاق ترفعنا. هنا تتابع كل مباراة وكل هدف، ونتذكّر أن الأخوة أغلى من أي فوز.</p>
       <p id="role-line">تصفح المباريات والترتيب والأخبار، وكن جزءاً من منافسة تجمعنا على الخير.</p>
       <a class="hero-link" href="matches-public.html">اكتشف المباريات ←</a>
     </section>
@@ -195,7 +197,7 @@
       }
       $("role-line").textContent = profile ? "دورك: " + (ROLE_LABELS[role] || role) : "تصفح المباريات والترتيب والأخبار، وكن جزءاً من منافسة تجمعنا على الخير.";
       $("auth-link").textContent = profile ? "خروج" : "حسابي";
-      $("auth-link").href = profile ? "#" : "index.html";
+      $("auth-link").href = profile ? "#" : "login.html";
       $("auth-link").onclick = async (e) => { if (profile) { e.preventDefault(); await signOut(auth); location.reload(); } };
       $("sheet-links").innerHTML = ROLE_LINKS[role].map(([ic, t, h]) => `<a href="${h}">${ic} ${t}</a>`).join("");
       document.documentElement.classList.remove("auth-pending");
